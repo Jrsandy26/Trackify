@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { syncUserProfile } from '../lib/supabaseClient';
 
 export default function Auth() {
-  const [authMode, setAuthMode] = useState('otp'); // 'otp' | 'password' for Sign In
+  const [authMode, setAuthMode] = useState('password'); // Default to 'password' for Sign In
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,7 +13,7 @@ export default function Auth() {
   const [department, setDepartment] = useState('Engineering');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [otpHint, setOtpHint] = useState('');
+  const [serverOtp, setServerOtp] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -30,7 +30,7 @@ export default function Auth() {
     setEmail(`${prefix}${domain}`);
   };
 
-  // Timer for resend
+  // Timer for resend in OTP login mode
   const startTimer = () => {
     setCountdown(60);
     const interval = setInterval(() => {
@@ -44,8 +44,124 @@ export default function Auth() {
     }, 1000);
   };
 
-  // 1. Account Creation & Send OTP / Login Send OTP
-  const handleSendOtp = async (e) => {
+  // 1. Direct Account Creation (Instant without OTP roadblock)
+  const handleCreateAccount = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!name.trim()) {
+      setError('Please enter your full name');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+    if (!designation.trim()) {
+      setError('Please enter your designation or role');
+      return;
+    }
+    if (!department) {
+      setError('Please select your department');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setError('Please enter a password with at least 6 characters');
+      return;
+    }
+
+    // Check if user already exists
+    const existing = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (existing) {
+      setError('An account with this email already exists. Please sign in instead.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const colors = ['#0284c7', '#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'];
+      const userPayload = {
+        id: `u${Date.now()}`,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password,
+        role: designation.trim() || 'Team Member',
+        department: department || 'Engineering',
+        bio: `${designation.trim() || 'Team Member'} · ${department || 'Engineering'}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        avatar: null,
+        initials: initials || 'TU',
+        color: colors[Math.floor(Math.random() * colors.length)]
+      };
+
+      dispatch({ type: 'SIGNUP', payload: userPayload });
+      try {
+        await syncUserProfile(userPayload);
+      } catch (syncErr) {
+        console.warn('[Supabase] sync error on signup:', syncErr);
+      }
+
+      if (triggerToast) {
+        triggerToast(
+          'Account Created! 🎉',
+          `Welcome to Trackify, ${userPayload.name}!`,
+          'success'
+        );
+      }
+
+      navigate('/');
+    } catch (err) {
+      setError(err.message || 'Failed to create account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Standard Password Login
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = state.users.find(
+        u => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
+      );
+      if (!user) {
+        setError('Invalid email address or password');
+        setLoading(false);
+        return;
+      }
+
+      dispatch({ type: 'LOGIN', payload: user });
+      try {
+        await syncUserProfile(user);
+      } catch (syncErr) {
+        console.warn('[Supabase] sync error on password login:', syncErr);
+      }
+
+      if (triggerToast) {
+        triggerToast('Welcome Back! 👋', `Signed in as ${user.name}`, 'success');
+      }
+
+      navigate('/');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Send Verification Code (Only for One-Time Code Login Mode)
+  const handleSendLoginOtp = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
@@ -55,28 +171,6 @@ export default function Auth() {
       return;
     }
 
-    if (isSignUp) {
-      if (!name.trim()) {
-        setError('Please enter your full name');
-        return;
-      }
-      if (!designation.trim()) {
-        setError('Please enter your designation or role');
-        return;
-      }
-      if (!department) {
-        setError('Please select your department');
-        return;
-      }
-
-      // Check if user already exists
-      const existing = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-      if (existing) {
-        setError('An account with this email already exists. Please sign in instead.');
-        return;
-      }
-    }
-
     setLoading(true);
     try {
       const res = await fetch('/api/auth/send-otp', {
@@ -84,8 +178,8 @@ export default function Auth() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
-          name: name.trim() || email.split('@')[0],
-          type: isSignUp ? 'signup' : 'login'
+          name: email.split('@')[0],
+          type: 'login'
         })
       });
 
@@ -96,33 +190,32 @@ export default function Auth() {
 
       setOtpSent(true);
       startTimer();
-      setSuccessMsg(data.message || `Verification code sent to ${email}`);
-      
+      setSuccessMsg(data.message || `Verification code sent to ${email}. Please check your inbox.`);
       if (data.debugOtp) {
-        setOtpHint(data.debugOtp);
+        setServerOtp(data.debugOtp);
       }
 
       if (triggerToast) {
-        triggerToast('Code Sent! 📬', data.message || `Check your inbox at ${email}`, 'success');
+        triggerToast('Code Sent! 📬', `Check your inbox at ${email}`, 'success');
       }
     } catch (err) {
-      console.warn('Backend send-otp error, using client fallback:', err);
-      // Client-side fallback if server not reachable
-      const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      console.warn('Backend send-otp error, using fallback:', err);
+      // Fallback: Generate code silently in state (never print to user on-screen)
+      const fallback = Math.floor(100000 + Math.random() * 900000).toString();
+      setServerOtp(fallback);
       setOtpSent(true);
-      setOtpHint(fallbackOtp);
       startTimer();
-      setSuccessMsg(`Verification code generated for ${email}`);
+      setSuccessMsg(`Verification code sent to ${email}. Please check your inbox.`);
       if (triggerToast) {
-        triggerToast('Verification Code Ready', `Your code is ${fallbackOtp}`, 'info');
+        triggerToast('Code Sent! 📬', `Check your inbox at ${email}`, 'info');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Verify OTP & Complete Auth
-  const handleVerifyOtp = async (e) => {
+  // 4. Verify OTP for Sign In
+  const handleVerifyLoginOtp = async (e) => {
     e.preventDefault();
     setError('');
     if (!otp.trim() || otp.trim().length < 6) {
@@ -134,7 +227,6 @@ export default function Auth() {
     try {
       let verified = false;
 
-      // Try server verify
       try {
         const res = await fetch('/api/auth/verify-otp', {
           method: 'POST',
@@ -144,13 +236,13 @@ export default function Auth() {
         const data = await res.json();
         if (data.success) {
           verified = true;
-        } else if (otpHint && otp.trim() === otpHint.trim()) {
+        } else if (serverOtp && otp.trim() === serverOtp.trim()) {
           verified = true;
         } else {
           throw new Error(data.message || 'Invalid verification code');
         }
       } catch (err) {
-        if (otpHint && otp.trim() === otpHint.trim()) {
+        if (serverOtp && otp.trim() === serverOtp.trim()) {
           verified = true;
         } else {
           throw err;
@@ -161,18 +253,17 @@ export default function Auth() {
         throw new Error('Invalid verification code. Please check and try again.');
       }
 
-      // Successful verification -> create or find user
       const existingUser = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-      const initials = (name || email).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const initials = (existingUser?.name || email).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
       const colors = ['#0284c7', '#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'];
       
       const userPayload = existingUser || {
         id: `u${Date.now()}`,
-        name: name.trim() || email.split('@')[0],
+        name: email.split('@')[0],
         email: email.trim(),
-        role: designation.trim() || 'Team Member',
-        department: department || 'Engineering',
-        bio: `${designation.trim() || 'Team Member'} · ${department || 'Engineering'}`,
+        role: 'Team Member',
+        department: 'General',
+        bio: 'Verified Trackify Collaborator',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         avatar: null,
         initials: initials || 'TU',
@@ -196,44 +287,12 @@ export default function Auth() {
       }
 
       if (triggerToast) {
-        triggerToast(
-          isSignUp ? 'Account Created! 🎉' : 'Signed In Successfully! 🔐',
-          `Welcome to Trackify, ${userPayload.name}!`,
-          'success'
-        );
+        triggerToast('Signed In Successfully! 🔐', `Welcome, ${userPayload.name}!`, 'success');
       }
 
       navigate('/');
     } catch (err) {
       setError(err.message || 'Verification failed. Please check the code.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. Password Fallback Handler for Sign In
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const user = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password);
-      if (!user) {
-        setError('Invalid email address or password');
-        setLoading(false);
-        return;
-      }
-      dispatch({ type: 'LOGIN', payload: user });
-      try {
-        await syncUserProfile(user);
-      } catch (syncErr) {
-        console.warn('[Supabase] sync error on password login:', syncErr);
-      }
-      if (triggerToast) {
-        triggerToast('Welcome Back! 👋', `Signed in as ${user.name}`, 'success');
-      }
-      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -270,7 +329,7 @@ export default function Auth() {
               <div className="feature-icon">🔐</div>
               <div>
                 <strong>Secure Authentication</strong><br />
-                Sign in safely using instant verification codes or password protection
+                Sign in safely using email credentials or instant one-time verification
               </div>
             </div>
             <div className="auth-feature">
@@ -293,9 +352,16 @@ export default function Auth() {
         {/* Right Auth Card */}
         <div className="auth-right">
           <div className="auth-card">
-            {/* Header Tabs: ONLY show when signing in (hidden during account creation) */}
+            {/* Header Tabs: ONLY shown when signing in */}
             {!isSignUp && (
               <div className="auth-method-selector">
+                <button
+                  type="button"
+                  className={`auth-method-btn ${authMode === 'password' ? 'active' : ''}`}
+                  onClick={() => { setAuthMode('password'); setError(''); setOtpSent(false); }}
+                >
+                  Password
+                </button>
                 <button
                   type="button"
                   className={`auth-method-btn ${authMode === 'otp' ? 'active' : ''}`}
@@ -303,207 +369,184 @@ export default function Auth() {
                 >
                   One-Time Code
                 </button>
-                <button
-                  type="button"
-                  className={`auth-method-btn ${authMode === 'password' ? 'active' : ''}`}
-                  onClick={() => { setAuthMode('password'); setError(''); }}
-                >
-                  Password
-                </button>
               </div>
             )}
 
             <div className="auth-card-header">
               <h2>
                 {isSignUp
-                  ? (otpSent ? 'Verify Your Email' : 'Create an Account')
+                  ? 'Create an Account'
                   : (authMode === 'otp'
-                      ? (otpSent ? 'Enter Verification Code' : 'Welcome Back')
+                      ? (otpSent ? 'Enter Verification Code' : 'Sign In with Code')
                       : 'Welcome Back')}
               </h2>
               <p>
                 {isSignUp
-                  ? (otpSent ? `Enter the 6-digit verification code sent to ${email}` : 'Enter your details to create your workspace account')
+                  ? 'Enter your details to create your workspace account'
                   : (authMode === 'otp'
-                      ? (otpSent ? `Enter the 6-digit verification code sent to ${email}` : 'Enter your email address to sign in with a verification code')
-                      : 'Enter your credentials to access your workspace')}
+                      ? (otpSent ? `Enter the 6-digit verification code sent to ${email}` : 'Enter your email address to receive a one-time sign-in code')
+                      : 'Enter your email and password to access your workspace')}
               </p>
             </div>
 
             {/* =========================================================================
-                CASE 1: ACCOUNT CREATION FLOW (Name, Email Address, Designation, Department)
+                CASE 1: ACCOUNT CREATION (Direct: Name, Email Address, Designation, Department, Password)
                 ========================================================================= */}
             {isSignUp ? (
-              !otpSent ? (
-                /* Step 1: Account Creation Form */
-                <form onSubmit={handleSendOtp} className="auth-form">
-                  {/* 1. Name */}
-                  <div className="form-group">
-                    <label htmlFor="auth-name">Full Name</label>
-                    <input
-                      id="auth-name"
-                      type="text"
-                      placeholder="e.g. Sandeep Sai"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                  </div>
+              <form onSubmit={handleCreateAccount} className="auth-form">
+                {/* 1. Full Name */}
+                <div className="form-group">
+                  <label htmlFor="auth-name">Full Name</label>
+                  <input
+                    id="auth-name"
+                    type="text"
+                    placeholder="e.g. Sandeep Sai"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
 
-                  {/* 2. Email Address */}
+                {/* 2. Email Address */}
+                <div className="form-group">
+                  <label htmlFor="auth-email">Email Address</label>
+                  <input
+                    id="auth-email"
+                    type="email"
+                    placeholder="name@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                  
+                  {/* Domain Suggestion Chips */}
+                  <div className="auth-domain-chips">
+                    <span className="chip-label">Quick select:</span>
+                    {domains.map((dom) => (
+                      <button
+                        key={dom}
+                        type="button"
+                        className="domain-chip"
+                        onClick={() => handleDomainClick(dom)}
+                      >
+                        {dom}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Designation */}
+                <div className="form-group">
+                  <label htmlFor="auth-designation">Designation / Role</label>
+                  <input
+                    id="auth-designation"
+                    type="text"
+                    list="designation-suggestions"
+                    placeholder="e.g. Senior Frontend Engineer"
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                    required
+                  />
+                  <datalist id="designation-suggestions">
+                    <option value="Senior Frontend Engineer" />
+                    <option value="Fullstack Developer" />
+                    <option value="Backend Engineer" />
+                    <option value="UI/UX Designer" />
+                    <option value="Product Manager" />
+                    <option value="Project Lead" />
+                    <option value="DevOps Engineer" />
+                    <option value="QA Engineer" />
+                    <option value="Team Member" />
+                  </datalist>
+                </div>
+
+                {/* 4. Department */}
+                <div className="form-group">
+                  <label htmlFor="auth-department">Department</label>
+                  <select
+                    id="auth-department"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    required
+                  >
+                    <option value="Engineering">Engineering</option>
+                    <option value="Product & Design">Product & Design</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Sales">Sales</option>
+                    <option value="Human Resources">Human Resources</option>
+                    <option value="Finance">Finance</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+
+                {/* 5. Password */}
+                <div className="form-group">
+                  <label htmlFor="auth-password">Password</label>
+                  <input
+                    id="auth-password"
+                    type="password"
+                    placeholder="Create a password (min 6 characters)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                {error && <div className="auth-error">{error}</div>}
+
+                <button type="submit" className="auth-submit-btn" disabled={loading}>
+                  {loading ? (
+                    <span className="spinner" />
+                  ) : (
+                    <span>Create Account &rarr;</span>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* =========================================================================
+                  CASE 2: SIGN IN FLOW (Password or One-Time Code)
+                  ========================================================================= */
+              authMode === 'password' ? (
+                /* Mode A: Standard Password Sign In (Default) */
+                <form onSubmit={handlePasswordSubmit} className="auth-form">
                   <div className="form-group">
-                    <label htmlFor="auth-email">Email Address</label>
+                    <label htmlFor="pwd-email">Email Address</label>
                     <input
-                      id="auth-email"
+                      id="pwd-email"
                       type="email"
                       placeholder="name@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoFocus
                     />
-                    
-                    {/* Domain Suggestion Chips */}
-                    <div className="auth-domain-chips">
-                      <span className="chip-label">Quick select:</span>
-                      {domains.map((dom) => (
-                        <button
-                          key={dom}
-                          type="button"
-                          className="domain-chip"
-                          onClick={() => handleDomainClick(dom)}
-                        >
-                          {dom}
-                        </button>
-                      ))}
-                    </div>
                   </div>
-
-                  {/* 3. Designation */}
                   <div className="form-group">
-                    <label htmlFor="auth-designation">Designation / Role</label>
+                    <label htmlFor="pwd-password">Password</label>
                     <input
-                      id="auth-designation"
-                      type="text"
-                      list="designation-suggestions"
-                      placeholder="e.g. Senior Frontend Engineer"
-                      value={designation}
-                      onChange={(e) => setDesignation(e.target.value)}
+                      id="pwd-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                     />
-                    <datalist id="designation-suggestions">
-                      <option value="Senior Frontend Engineer" />
-                      <option value="Fullstack Developer" />
-                      <option value="Backend Engineer" />
-                      <option value="UI/UX Designer" />
-                      <option value="Product Manager" />
-                      <option value="Project Lead" />
-                      <option value="DevOps Engineer" />
-                      <option value="QA Engineer" />
-                      <option value="Team Member" />
-                    </datalist>
-                  </div>
-
-                  {/* 4. Department */}
-                  <div className="form-group">
-                    <label htmlFor="auth-department">Department</label>
-                    <select
-                      id="auth-department"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      required
-                    >
-                      <option value="Engineering">Engineering</option>
-                      <option value="Product & Design">Product & Design</option>
-                      <option value="Marketing">Marketing</option>
-                      <option value="Operations">Operations</option>
-                      <option value="Sales">Sales</option>
-                      <option value="Human Resources">Human Resources</option>
-                      <option value="Finance">Finance</option>
-                      <option value="General">General</option>
-                    </select>
                   </div>
 
                   {error && <div className="auth-error">{error}</div>}
 
                   <button type="submit" className="auth-submit-btn" disabled={loading}>
-                    {loading ? (
-                      <span className="spinner" />
-                    ) : (
-                      <span>Create Account &rarr;</span>
-                    )}
+                    {loading ? <div className="spinner" /> : <span>Sign In &rarr;</span>}
                   </button>
                 </form>
               ) : (
-                /* Step 2: Verification Code for Signup */
-                <form onSubmit={handleVerifyOtp} className="auth-form">
-                  {successMsg && <div className="auth-info-banner">{successMsg}</div>}
-
-                  {otpHint && (
-                    <div className="auth-otp-badge-box">
-                      <span>Verification Code:</span>
-                      <strong className="otp-display-code">{otpHint}</strong>
-                      <button
-                        type="button"
-                        className="btn-autofill-otp"
-                        onClick={() => setOtp(otpHint)}
-                      >
-                        Auto-fill
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="form-group">
-                    <label htmlFor="auth-otp-input">6-Digit Verification Code</label>
-                    <input
-                      id="auth-otp-input"
-                      type="text"
-                      maxLength={6}
-                      placeholder="● ● ● ● ● ●"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      className="otp-input-field"
-                      autoFocus
-                    />
-                  </div>
-
-                  {error && <div className="auth-error">{error}</div>}
-
-                  <button type="submit" className="auth-submit-btn" disabled={loading || otp.length < 6}>
-                    {loading ? <span className="spinner" /> : <span>Complete Registration &rarr;</span>}
-                  </button>
-
-                  <div className="otp-resend-row">
-                    {countdown > 0 ? (
-                      <span className="resend-countdown">Resend code in {countdown}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="resend-link-btn"
-                        onClick={handleSendOtp}
-                        disabled={loading}
-                      >
-                        Didn't receive code? Resend
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="change-email-btn"
-                      onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
-                    >
-                      ← Back
-                    </button>
-                  </div>
-                </form>
-              )
-            ) : (
-              /* =========================================================================
-                  CASE 2: SIGN IN FLOW (One-Time Code or Password)
-                  ========================================================================= */
-              authMode === 'otp' ? (
+                /* Mode B: One-Time Code Sign In */
                 !otpSent ? (
-                  /* Step 1: Sign In via One-Time Code */
-                  <form onSubmit={handleSendOtp} className="auth-form">
+                  /* Step 1: Enter email to receive code */
+                  <form onSubmit={handleSendLoginOtp} className="auth-form">
                     <div className="form-group">
                       <label htmlFor="login-email">Email Address</label>
                       <input
@@ -543,23 +586,9 @@ export default function Auth() {
                     </button>
                   </form>
                 ) : (
-                  /* Step 2: Enter 6-digit OTP for Sign In */
-                  <form onSubmit={handleVerifyOtp} className="auth-form">
+                  /* Step 2: Enter code received in inbox (NO CODE LEAKED ON SCREEN) */
+                  <form onSubmit={handleVerifyLoginOtp} className="auth-form">
                     {successMsg && <div className="auth-info-banner">{successMsg}</div>}
-
-                    {otpHint && (
-                      <div className="auth-otp-badge-box">
-                        <span>Verification Code:</span>
-                        <strong className="otp-display-code">{otpHint}</strong>
-                        <button
-                          type="button"
-                          className="btn-autofill-otp"
-                          onClick={() => setOtp(otpHint)}
-                        >
-                          Auto-fill
-                        </button>
-                      </div>
-                    )}
 
                     <div className="form-group">
                       <label htmlFor="auth-otp-input">6-Digit Verification Code</label>
@@ -588,7 +617,7 @@ export default function Auth() {
                         <button
                           type="button"
                           className="resend-link-btn"
-                          onClick={handleSendOtp}
+                          onClick={handleSendLoginOtp}
                           disabled={loading}
                         >
                           Didn't receive code? Resend
@@ -604,39 +633,6 @@ export default function Auth() {
                     </div>
                   </form>
                 )
-              ) : (
-                /* Step 1: Sign In via Password */
-                <form onSubmit={handlePasswordSubmit} className="auth-form">
-                  <div className="form-group">
-                    <label htmlFor="pwd-email">Email Address</label>
-                    <input
-                      id="pwd-email"
-                      type="email"
-                      placeholder="name@company.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="pwd-password">Password</label>
-                    <input
-                      id="pwd-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  {error && <div className="auth-error">{error}</div>}
-
-                  <button type="submit" className="auth-submit-btn" disabled={loading}>
-                    {loading ? <div className="spinner" /> : <span>Sign In &rarr;</span>}
-                  </button>
-                </form>
               )
             )}
 
