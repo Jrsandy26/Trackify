@@ -309,7 +309,7 @@ export default function Projects() {
   const confirmDeleteProject = () => {
     if (!projectToDelete) return;
     dispatch({ type: 'DELETE_PROJECT', payload: projectToDelete.id });
-    if (triggerToast) triggerToast('Project Deleted 🗑️', `"${projectToDelete.name}" and associated tasks removed.`, 'info');
+    if (triggerToast) triggerToast('Project Deleted', `"${projectToDelete.name}" and associated tasks removed.`, 'info');
     if (managingProjectId === projectToDelete.id) {
       setManagingProjectId(null);
     }
@@ -486,7 +486,7 @@ export default function Projects() {
         </div>
         <button className="btn-new-project-pill" onClick={() => setShowNewProjectModal(true)}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          + New Project
+          New Project
         </button>
       </div>
 
@@ -678,14 +678,22 @@ export default function Projects() {
                           })}
                           title="Edit Project"
                         >
-                          ✎
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
                         </button>
                         <button
                           className="card-quick-btn delete"
                           onClick={() => setProjectToDelete(proj)}
                           title="Delete Project"
                         >
-                          🗑️
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -860,14 +868,22 @@ export default function Projects() {
                               })}
                               title="Edit Project"
                             >
-                              ✎
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
                             </button>
                             <button
                               className="btn-table-icon-delete"
                               onClick={() => setProjectToDelete(p)}
                               title="Delete Project"
                             >
-                              🗑️
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                              </svg>
                             </button>
                           </div>
                         </td>
@@ -1050,14 +1066,24 @@ export default function Projects() {
                   }}
                   title="Edit Project Details"
                 >
-                  ✎ Edit
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '5px' }}>
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  Edit
                 </button>
                 <button
                   className="btn-drawer-header-action delete"
                   onClick={() => setProjectToDelete(managingProject)}
                   title="Delete Project"
                 >
-                  🗑️ Delete
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '5px' }}>
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                  Delete
                 </button>
                 <button className="drawer-close-btn" onClick={() => setManagingProject(null)}>✕</button>
               </div>
@@ -1119,11 +1145,16 @@ export default function Projects() {
                           className="btn-drawer-task-delete"
                           onClick={() => {
                             dispatch({ type: 'DELETE_TASK', payload: task.id });
-                            if (triggerToast) triggerToast('Task Deleted 🗑️', `"${task.title}" was removed.`, 'info');
+                            if (triggerToast) triggerToast('Task Deleted', `"${task.title}" was removed.`, 'info');
                           }}
                           title="Delete Task"
                         >
-                          ✕
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -1155,7 +1186,7 @@ export default function Projects() {
 
               {/* Add New Task Form */}
               <form onSubmit={handleAddDrawerTask} className="drawer-add-task-form">
-                <h4>+ Add New Task to this Project</h4>
+                <h4>Add New Task to this Project</h4>
                 <div className="drawer-task-inputs-grid">
                   <input
                     type="text"
@@ -1677,7 +1708,12 @@ export default function Projects() {
         <div className="modern-modal-backdrop" onClick={() => setProjectToDelete(null)}>
           <div className="modern-modal-card danger-modal" onClick={e => e.stopPropagation()}>
             <div className="danger-modal-icon-badge">
-              🗑️
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
             </div>
             <h2>Delete Project?</h2>
             <p>

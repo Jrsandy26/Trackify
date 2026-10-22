@@ -199,7 +199,7 @@ export default function Tasks() {
   // Delete Task Handler
   const handleDeleteTask = (taskId, taskTitle) => {
     dispatch({ type: 'DELETE_TASK', payload: taskId });
-    if (triggerToast) triggerToast('Task Deleted 🗑️', `"${taskTitle || 'Task'}" removed.`, 'info');
+    if (triggerToast) triggerToast('Task Deleted', `"${taskTitle || 'Task'}" removed.`, 'info');
     if (taskToDelete && taskToDelete.id === taskId) {
       setTaskToDelete(null);
     }
@@ -224,7 +224,7 @@ export default function Tasks() {
         </div>
         <button className="btn btn-primary" onClick={() => setShowNewTask(true)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          + New Task
+          New Task
         </button>
       </div>
 
@@ -494,7 +494,14 @@ export default function Tasks() {
       {taskToDelete && (
         <div className="modal-overlay" onClick={() => setTaskToDelete(null)}>
           <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
-            <div className="danger-modal-icon-badge">🗑️</div>
+            <div className="danger-modal-icon-badge">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </div>
             <h2>Delete Task?</h2>
             <p>Are you sure you want to delete <strong>"{taskToDelete.title}"</strong>? This action cannot be undone.</p>
             <div className="modal-actions" style={{ justifyContent: 'center', marginTop: '16px' }}>
@@ -557,7 +564,10 @@ export default function Tasks() {
                                         onClick={(e) => { e.stopPropagation(); setEditingTask(task); }}
                                         title="Edit Task"
                                       >
-                                        ✎
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
                                       </button>
                                       <button
                                         type="button"
@@ -565,7 +575,12 @@ export default function Tasks() {
                                         onClick={(e) => { e.stopPropagation(); setTaskToDelete(task); }}
                                         title="Delete Task"
                                       >
-                                        🗑️
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="3 6 5 6 21 6"/>
+                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                          <line x1="10" y1="11" x2="10" y2="17"/>
+                                          <line x1="14" y1="11" x2="14" y2="17"/>
+                                        </svg>
                                       </button>
                                     </div>
 
