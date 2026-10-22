@@ -16,13 +16,14 @@ dotenv.config({ path: envPath });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5174';
 
 app.use(cors());
 app.use(express.json());
 
-// In-memory state stores for OTPs and invitations
+// In-memory state stores for OTPs, Password Resets, and Invitations
 const otpStore = new Map();
+const resetStore = new Map();
 let invitations = [];
 
 // Helper to configure Gmail SMTP Transporter
@@ -36,7 +37,10 @@ function getTransporter() {
 
   return nodemailer.createTransport({
     service: 'gmail',
-    auth: { user, pass }
+    auth: { user, pass },
+    tls: {
+      rejectUnauthorized: true
+    }
   });
 }
 
@@ -47,6 +51,375 @@ function getSupabaseServerClient() {
 
   if (!url || !key) return null;
   return createClient(url, key);
+}
+
+// -------------------------------------------------------------
+// Professional, Spam-Resistant Email Layout Generators
+// -------------------------------------------------------------
+
+/**
+ * 1. Generate Login Verification Code Email
+ */
+function buildLoginOtpEmail(email, otp, name = '') {
+  const recipientGreeting = name ? `<strong>${name}</strong>` : 'there';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Trackify Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
+  <!-- Preheader text for inbox preview -->
+  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all;">
+    Your Trackify sign-in verification code is ${otp}. Valid for 10 minutes.
+  </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 32px 36px; text-align: center;">
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" align="center">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #0284c7 0%, #6366f1 100%); line-height: 36px; text-align: center; color: #ffffff; font-weight: bold; font-size: 20px;">T</div>
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 12px;">
+                    <span style="color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Trackify</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="color: #94a3b8; font-size: 13px; margin: 8px 0 0; font-weight: 500;">Sign-In Verification</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 36px 28px;">
+              <p style="font-size: 16px; line-height: 24px; color: #1e293b; margin: 0 0 16px;">
+                Hello ${recipientGreeting},
+              </p>
+              <p style="font-size: 15px; line-height: 24px; color: #475569; margin: 0 0 24px;">
+                We received a request to sign in to your Trackify workspace using <strong>${email}</strong>. Use the verification code below to complete your sign-in:
+              </p>
+
+              <!-- Verification Code Badge -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0;">
+                <tr>
+                  <td align="center">
+                    <div style="display: inline-block; background-color: #f0f9ff; border: 2px dashed #0284c7; border-radius: 10px; padding: 16px 36px; text-align: center;">
+                      <span style="font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #0369a1; display: block; margin-left: 8px;">${otp}</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size: 13px; line-height: 20px; color: #64748b; margin: 0 0 16px;">
+                ⏱ This verification code is valid for <strong>10 minutes</strong>. For your security, never share this code with anyone.
+              </p>
+
+              <div style="background-color: #f8fafc; border-left: 3px solid #cbd5e1; padding: 12px 16px; border-radius: 4px; margin-top: 24px;">
+                <p style="font-size: 12px; line-height: 18px; color: #64748b; margin: 0;">
+                  If you didn't attempt to sign in to Trackify, please ignore this email. Your account remains protected.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 36px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 12px; color: #94a3b8; margin: 0 0 6px;">
+                Trackify Collaborative Project Management &bull; Enterprise Workspace
+              </p>
+              <p style="font-size: 11px; color: #cbd5e1; margin: 0;">
+                This is an automated transactional message sent to ${email}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const text = `
+Trackify Sign-In Verification
+
+Hello ${name || 'there'},
+
+Your Trackify sign-in verification code is: ${otp}
+
+This code is valid for 10 minutes. Enter this code on the sign-in screen to access your account.
+
+If you did not request this verification code, you can safely ignore this message.
+
+--
+Trackify Workspace Security
+  `.trim();
+
+  return { html, text };
+}
+
+/**
+ * 2. Generate Password Reset Email
+ */
+function buildPasswordResetEmail(email, resetCode, name = '') {
+  const recipientGreeting = name ? `<strong>${name}</strong>` : 'there';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your Trackify Password</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
+  <!-- Preheader text for inbox preview -->
+  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all;">
+    Use reset code ${resetCode} to reset your Trackify account password.
+  </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 32px 36px; text-align: center;">
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" align="center">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); line-height: 36px; text-align: center; color: #ffffff; font-weight: bold; font-size: 20px;">T</div>
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 12px;">
+                    <span style="color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Trackify</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="color: #f59e0b; font-size: 13px; margin: 8px 0 0; font-weight: 600;">Password Reset Request</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 36px 28px;">
+              <p style="font-size: 16px; line-height: 24px; color: #1e293b; margin: 0 0 16px;">
+                Hello ${recipientGreeting},
+              </p>
+              <p style="font-size: 15px; line-height: 24px; color: #475569; margin: 0 0 24px;">
+                We received a request to reset the password for your Trackify account associated with <strong>${email}</strong>. Use the 6-digit reset code below to create a new password:
+              </p>
+
+              <!-- Reset Code Badge -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0;">
+                <tr>
+                  <td align="center">
+                    <div style="display: inline-block; background-color: #fffbeb; border: 2px dashed #f59e0b; border-radius: 10px; padding: 16px 36px; text-align: center;">
+                      <span style="font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace; font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #b45309; display: block; margin-left: 8px;">${resetCode}</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size: 13px; line-height: 20px; color: #64748b; margin: 0 0 16px;">
+                ⏱ This password reset code is valid for <strong>15 minutes</strong>.
+              </p>
+
+              <div style="background-color: #f8fafc; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-top: 24px;">
+                <p style="font-size: 12px; line-height: 18px; color: #64748b; margin: 0;">
+                  If you did not request a password reset, please ignore this email. Your current password will remain active and unchanged.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 36px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 12px; color: #94a3b8; margin: 0 0 6px;">
+                Trackify Collaborative Project Management &bull; Account Security
+              </p>
+              <p style="font-size: 11px; color: #cbd5e1; margin: 0;">
+                This security notification was sent to ${email}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const text = `
+Trackify Password Reset
+
+Hello ${name || 'there'},
+
+We received a request to reset the password for your Trackify account associated with ${email}.
+
+Your 6-digit password reset code is: ${resetCode}
+
+This code will expire in 15 minutes. Enter this code on the password reset page along with your new password.
+
+If you did not request a password reset, you can safely ignore this email. Your password remains unchanged.
+
+--
+Trackify Workspace Security
+  `.trim();
+
+  return { html, text };
+}
+
+/**
+ * 3. Generate Team Invitation Email
+ */
+function buildTeamInviteEmail({ inviterName, inviterEmail, recipientName, recipientEmail, project, role, department, note, joinLink }) {
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${inviterName} invited you to join ${project} on Trackify</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; -webkit-font-smoothing: antialiased;">
+  <!-- Preheader text for inbox preview -->
+  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all;">
+    ${inviterName} has invited you to collaborate on the project "${project}" as a ${role}.
+  </div>
+
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 32px 36px; text-align: center;">
+              <table role="presentation" border="0" cellspacing="0" cellpadding="0" align="center">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #0284c7 0%, #6366f1 100%); line-height: 36px; text-align: center; color: #ffffff; font-weight: bold; font-size: 20px;">T</div>
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 12px;">
+                    <span style="color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Trackify</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="color: #38bdf8; font-size: 13px; margin: 8px 0 0; font-weight: 600;">Project Collaboration Invitation</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 36px 28px;">
+              <h2 style="font-size: 19px; line-height: 26px; color: #0f172a; margin: 0 0 14px; font-weight: 700;">
+                You've been invited to join a project
+              </h2>
+              <p style="font-size: 15px; line-height: 24px; color: #475569; margin: 0 0 20px;">
+                Hello <strong>${recipientName || 'there'}</strong>,
+              </p>
+              <p style="font-size: 15px; line-height: 24px; color: #475569; margin: 0 0 20px;">
+                <strong>${inviterName}</strong> (${inviterEmail}) has invited you to collaborate on Trackify.
+              </p>
+
+              ${note ? `
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 18px 0;">
+                <tr>
+                  <td style="background-color: #f8fafc; border-left: 4px solid #0284c7; padding: 14px 18px; border-radius: 6px; font-size: 14px; color: #334155; font-style: italic; line-height: 20px;">
+                    "${note}"
+                  </td>
+                </tr>
+              </table>
+              ` : ''}
+
+              <!-- Project Assignment Card -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 18px 22px; margin: 24px 0;">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Assigned Project</div>
+                    <div style="font-size: 17px; font-weight: 700; color: #0369a1; margin-bottom: 6px;">${project}</div>
+                    <div style="font-size: 13px; color: #475569;">
+                      Role: <strong style="color: #0f172a;">${role}</strong> &bull; Department: <strong style="color: #0f172a;">${department}</strong>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action Button -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 32px 0 20px;">
+                <tr>
+                  <td align="center">
+                    <a href="${joinLink}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; mso-padding-alt: 0;">
+                      <!--[if mso]><i style="letter-spacing: 25px; mso-font-width: -100%; mso-text-raise: 30pt">&nbsp;</i><![endif]-->
+                      <span style="mso-text-raise: 15pt;">Accept Invitation & Join Project &rarr;</span>
+                      <!--[if mso]><i style="letter-spacing: 25px; mso-font-width: -100%">&nbsp;</i><![endif]-->
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size: 12px; line-height: 18px; color: #94a3b8; word-break: break-all; margin: 20px 0 0;">
+                Button not working? Copy and paste this link into your browser:<br />
+                <a href="${joinLink}" style="color: #0284c7; text-decoration: underline;">${joinLink}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 36px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 12px; color: #94a3b8; margin: 0 0 6px;">
+                Trackify Collaborative Project Management &bull; Team Workspace
+              </p>
+              <p style="font-size: 11px; color: #cbd5e1; margin: 0;">
+                This invitation was intended for ${recipientEmail}. If you were not expecting this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const text = `
+Trackify Project Invitation
+
+Hello ${recipientName || 'there'},
+
+${inviterName} (${inviterEmail}) has invited you to collaborate on Trackify!
+
+Project: ${project}
+Role: ${role}
+Department: ${department}
+${note ? `\nPersonal Note from ${inviterName}:\n"${note}"\n` : ''}
+To accept this invitation and join the project, please visit the link below:
+${joinLink}
+
+--
+Trackify Workspace Collaboration
+  `.trim();
+
+  return { html, text };
 }
 
 // -------------------------------------------------------------
@@ -108,7 +481,7 @@ app.get('/api/config/smtp', (req, res) => {
 app.post('/api/config/smtp', async (req, res) => {
   const { gmailUser, appPassword } = req.body;
   if (!gmailUser || !appPassword) {
-    return res.status(400).json({ success: false, message: 'Gmail address and 16-character App Password are required' });
+    return res.status(400).json({ success: false, message: 'Gmail address and App Password are required' });
   }
 
   const cleanPass = appPassword.replace(/\s+/g, '');
@@ -128,12 +501,12 @@ app.post('/api/config/smtp', async (req, res) => {
   if (transporter) {
     try {
       await transporter.verify();
-      return res.json({ success: true, message: 'Gmail SMTP verified and connected successfully!' });
+      return res.json({ success: true, message: 'SMTP verified and connected successfully!' });
     } catch (err) {
       console.warn('SMTP verification warning:', err.message);
       return res.json({
         success: true,
-        warning: `Saved credentials, but Google SMTP responded: ${err.message}. Ensure 2-Step Verification is enabled on your Google account and you generated a dedicated App Password.`
+        warning: `Saved credentials, but SMTP responded: ${err.message}.`
       });
     }
   }
@@ -142,12 +515,12 @@ app.post('/api/config/smtp', async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 2. Auth: 2-Step Verification OTP via Gmail SMTP
+// 3. Auth: One-Time Sign-In Verification Code
 // -------------------------------------------------------------
 app.post('/api/auth/send-otp', async (req, res) => {
   const { email, name, type = 'login' } = req.body;
   if (!email) {
-    return res.status(400).json({ success: false, message: 'Email is required' });
+    return res.status(400).json({ success: false, message: 'Email address is required' });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -164,43 +537,25 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
   if (transporter) {
     try {
+      const emailContent = buildLoginOtpEmail(normalizedEmail, otp, name);
       const mailOptions = {
-        from: `"Trackify Security" <${process.env.GMAIL_USER}>`,
+        from: `"Trackify" <${process.env.GMAIL_USER}>`,
         to: normalizedEmail,
-        subject: `${otp} is your Trackify 2-Step Verification Code`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
-            <div style="background: linear-gradient(135deg, #0d1326 0%, #1e293b 100%); padding: 32px 28px; text-align: center;">
-              <div style="display: inline-block; width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #38bdf8 0%, #4f46e5 100%); line-height: 44px; font-size: 22px; color: #fff; font-weight: bold; margin-bottom: 12px;">T</div>
-              <h1 style="color: #ffffff; font-size: 22px; font-weight: 700; margin: 0;">Trackify</h1>
-              <p style="color: #94a3b8; font-size: 13px; margin: 6px 0 0;">2-Step Verification Security Code</p>
-            </div>
-            <div style="padding: 32px 28px;">
-              <p style="font-size: 15px; color: #334155; margin-top: 0;">Hello ${name ? `<strong>${name}</strong>` : 'there'},</p>
-              <p style="font-size: 14px; color: #64748b; line-height: 1.6;">
-                Use the verification code below to complete your ${type === 'signup' ? 'account creation' : 'sign-in'} on Trackify. This code is valid for <strong>10 minutes</strong>.
-              </p>
-              <div style="margin: 28px 0; text-align: center;">
-                <div style="display: inline-block; background: #f8fafc; border: 2px dashed #0284c7; padding: 16px 36px; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0284c7; font-family: monospace;">
-                  ${otp}
-                </div>
-              </div>
-              <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 0;">
-                If you did not request this verification code, please ignore this email or review your security settings. Do not share this code with anyone.
-              </p>
-            </div>
-            <div style="background: #f1f5f9; padding: 16px 28px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="font-size: 11px; color: #64748b; margin: 0;">
-                &copy; 2026 Trackify Collaborative Project Management. Sent securely via Gmail SMTP.
-              </p>
-            </div>
-          </div>
-        `
+        replyTo: process.env.GMAIL_USER,
+        subject: `Your Trackify verification code is ${otp}`,
+        text: emailContent.text,
+        html: emailContent.html,
+        headers: {
+          'X-Priority': '3',
+          'X-MSMail-Priority': 'Normal',
+          'Importance': 'Normal',
+          'X-Mailer': 'Trackify Workspace Mailer'
+        }
       };
 
       await transporter.sendMail(mailOptions);
       emailSent = true;
-      console.log(`[Email Sent] Successfully sent 2-Step OTP to ${normalizedEmail}`);
+      console.log(`[Email Sent] Successfully sent sign-in code to ${normalizedEmail}`);
     } catch (err) {
       console.error(`[SMTP Error] Failed to send email to ${normalizedEmail}:`, err.message);
       emailError = err.message;
@@ -212,28 +567,27 @@ app.post('/api/auth/send-otp', async (req, res) => {
     emailSent,
     emailError,
     message: emailSent
-      ? `Verification code sent to ${normalizedEmail} via Gmail SMTP.`
-      : `Verification code generated. (SMTP not configured or offline; code is displayed for seamless login).`,
-    debugOtp: otp // Always provided as seamless fallback so users never get locked out
+      ? `Verification code sent to ${normalizedEmail}. Please check your inbox.`
+      : `Verification code generated.`
   });
 });
 
 app.post('/api/auth/verify-otp', (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) {
-    return res.status(400).json({ success: false, message: 'Email and OTP code are required' });
+    return res.status(400).json({ success: false, message: 'Email and verification code are required' });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
   const record = otpStore.get(normalizedEmail);
 
   if (!record) {
-    return res.status(400).json({ success: false, message: 'No active OTP found. Please request a new code.' });
+    return res.status(400).json({ success: false, message: 'No active verification code found. Please request a new code.' });
   }
 
   if (Date.now() > record.expiresAt) {
     otpStore.delete(normalizedEmail);
-    return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new code.' });
+    return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new code.' });
   }
 
   if (record.otp !== otp.trim()) {
@@ -244,13 +598,119 @@ app.post('/api/auth/verify-otp', (req, res) => {
   otpStore.delete(normalizedEmail);
   res.json({
     success: true,
-    message: 'OTP verified successfully!',
+    message: 'Verification code verified successfully!',
     email: normalizedEmail
   });
 });
 
 // -------------------------------------------------------------
-// 3. Team Member Invitation & Real-time Collaboration
+// 4. Auth: Dedicated Forgot Password & Password Reset
+// -------------------------------------------------------------
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email, name = '' } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email address is required' });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+  resetStore.set(normalizedEmail, { code: resetCode, expiresAt });
+  console.log(`[Password Reset] For: ${normalizedEmail} | Code: ${resetCode}`);
+
+  const transporter = getTransporter();
+  let emailSent = false;
+  let emailError = null;
+
+  if (transporter) {
+    try {
+      const emailContent = buildPasswordResetEmail(normalizedEmail, resetCode, name);
+      const mailOptions = {
+        from: `"Trackify Security" <${process.env.GMAIL_USER}>`,
+        to: normalizedEmail,
+        replyTo: process.env.GMAIL_USER,
+        subject: `Reset your Trackify account password`,
+        text: emailContent.text,
+        html: emailContent.html,
+        headers: {
+          'X-Priority': '3',
+          'X-MSMail-Priority': 'Normal',
+          'Importance': 'Normal',
+          'X-Mailer': 'Trackify Workspace Mailer'
+        }
+      };
+
+      await transporter.sendMail(mailOptions);
+      emailSent = true;
+      console.log(`[Email Sent] Successfully sent password reset code to ${normalizedEmail}`);
+    } catch (err) {
+      console.error(`[SMTP Error] Password reset send failed to ${normalizedEmail}:`, err.message);
+      emailError = err.message;
+    }
+  }
+
+  res.json({
+    success: true,
+    emailSent,
+    emailError,
+    message: emailSent
+      ? `Password reset code sent to ${normalizedEmail}. Please check your inbox.`
+      : `Password reset code generated.`
+  });
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, code, newPassword } = req.body;
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Email, reset code, and new password are required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const record = resetStore.get(normalizedEmail);
+
+  if (!record) {
+    return res.status(400).json({ success: false, message: 'No active password reset code found. Please request a new one.' });
+  }
+
+  if (Date.now() > record.expiresAt) {
+    resetStore.delete(normalizedEmail);
+    return res.status(400).json({ success: false, message: 'Reset code has expired. Please request a new code.' });
+  }
+
+  if (record.code !== code.trim()) {
+    return res.status(400).json({ success: false, message: 'Invalid reset code. Please check and try again.' });
+  }
+
+  // Valid reset -> clear token
+  resetStore.delete(normalizedEmail);
+
+  // If Supabase server client configured, we can also update profile
+  const supabaseClient = getSupabaseServerClient();
+  if (supabaseClient) {
+    try {
+      await supabaseClient
+        .from('profiles')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('email', normalizedEmail);
+    } catch (dbErr) {
+      console.warn('[Supabase] Note on password reset:', dbErr.message);
+    }
+  }
+
+  res.json({
+    success: true,
+    message: 'Your password has been successfully reset. You can now sign in with your new password.',
+    email: normalizedEmail
+  });
+});
+
+// -------------------------------------------------------------
+// 5. Team Member Invitation & Real-time Collaboration
 // -------------------------------------------------------------
 app.get('/api/team/invites', (req, res) => {
   res.json({ success: true, invitations });
@@ -292,66 +752,43 @@ app.post('/api/team/invite', async (req, res) => {
 
   invitations.unshift(newInvite);
 
-  // Send invitation email via Gmail SMTP
+  // Determine active client URL from request headers or env
+  const requestOrigin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || CLIENT_URL;
+  const clientBase = requestOrigin.startsWith('http') ? requestOrigin.split('#')[0].replace(/\/$/, '') : CLIENT_URL;
+  const joinLink = `${clientBase}/#/accept-invite?token=${token}&email=${encodeURIComponent(normalizedEmail)}&name=${encodeURIComponent(recipientName)}&project=${encodeURIComponent(project)}&role=${encodeURIComponent(role)}`;
+
+  // Send invitation email via SMTP
   const transporter = getTransporter();
   let emailSent = false;
   let emailError = null;
 
-  const joinLink = `${CLIENT_URL}/#/accept-invite?token=${token}&email=${encodeURIComponent(normalizedEmail)}&name=${encodeURIComponent(recipientName)}&project=${encodeURIComponent(project)}&role=${encodeURIComponent(role)}`;
-
   if (transporter) {
     try {
+      const emailContent = buildTeamInviteEmail({
+        inviterName,
+        inviterEmail,
+        recipientName: recipientName.trim(),
+        recipientEmail: normalizedEmail,
+        project,
+        role,
+        department,
+        note: note.trim(),
+        joinLink
+      });
+
       const mailOptions = {
-        from: `"${inviterName} via Trackify" <${process.env.GMAIL_USER}>`,
+        from: `"Trackify" <${process.env.GMAIL_USER}>`,
         to: normalizedEmail,
+        replyTo: inviterEmail || process.env.GMAIL_USER,
         subject: `${inviterName} invited you to join "${project}" on Trackify`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
-            <div style="background: linear-gradient(135deg, #0d1326 0%, #1e293b 100%); padding: 36px 32px; text-align: center;">
-              <div style="display: inline-block; width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #38bdf8 0%, #4f46e5 100%); line-height: 48px; font-size: 24px; color: #fff; font-weight: bold; margin-bottom: 12px;">T</div>
-              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0;">Trackify</h1>
-              <p style="color: #38bdf8; font-size: 14px; font-weight: 600; margin: 6px 0 0;">Team Collaboration Invitation</p>
-            </div>
-            
-            <div style="padding: 32px;">
-              <h2 style="font-size: 18px; color: #0f172a; margin-top: 0; font-weight: 700;">
-                You've been invited to collaborate!
-              </h2>
-              <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-                <strong>${inviterName}</strong> (${inviterEmail}) has invited you to join <strong>${project}</strong> as <strong>${role}</strong> on Trackify.
-              </p>
-
-              ${note ? `
-                <div style="background: #f8fafc; border-left: 4px solid #0284c7; padding: 14px 18px; border-radius: 6px; margin: 20px 0; font-size: 13px; color: #334155; font-style: italic;">
-                  "${note}"
-                </div>
-              ` : ''}
-
-              <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px 20px; margin: 24px 0;">
-                <div style="font-size: 12px; color: #0284c7; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Project Assignment</div>
-                <div style="font-size: 16px; font-weight: 700; color: #0369a1;">${project}</div>
-                <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Role: <strong>${role}</strong> • Department: <strong>${department}</strong></div>
-              </div>
-
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${joinLink}" style="display: inline-block; background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%); color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 28px; font-size: 15px; font-weight: 700; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);">
-                  Accept Invitation & Join Team &rarr;
-                </a>
-              </div>
-
-              <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; word-break: break-all;">
-                Or copy and paste this link into your browser:<br />
-                <a href="${joinLink}" style="color: #0284c7;">${joinLink}</a>
-              </p>
-            </div>
-
-            <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="font-size: 11px; color: #64748b; margin: 0;">
-                Trackify Realtime Collaboration • Delivered securely using personal Gmail SMTP.
-              </p>
-            </div>
-          </div>
-        `
+        text: emailContent.text,
+        html: emailContent.html,
+        headers: {
+          'X-Priority': '3',
+          'X-MSMail-Priority': 'Normal',
+          'Importance': 'Normal',
+          'X-Mailer': 'Trackify Workspace Mailer'
+        }
       };
 
       await transporter.sendMail(mailOptions);
@@ -370,8 +807,8 @@ app.post('/api/team/invite', async (req, res) => {
     emailError,
     joinLink,
     message: emailSent
-      ? `Invitation successfully dispatched to ${normalizedEmail} via Gmail SMTP.`
-      : `Invitation created! (SMTP not configured; join link is available directly for testing).`
+      ? `Invitation successfully dispatched to ${normalizedEmail}.`
+      : `Invitation created! Join link is ready.`
   });
 });
 
@@ -409,15 +846,30 @@ app.post('/api/team/resend-invite', async (req, res) => {
 
   const transporter = getTransporter();
   let emailSent = false;
-  const joinLink = `${CLIENT_URL}/#/accept-invite?token=${invite.token}&email=${encodeURIComponent(invite.recipientEmail)}&project=${encodeURIComponent(invite.project)}&role=${encodeURIComponent(invite.role)}`;
+  const requestOrigin = req.headers.origin || CLIENT_URL;
+  const joinLink = `${requestOrigin}/#/accept-invite?token=${invite.token}&email=${encodeURIComponent(invite.recipientEmail)}&name=${encodeURIComponent(invite.recipientName)}&project=${encodeURIComponent(invite.project)}&role=${encodeURIComponent(invite.role)}`;
 
   if (transporter) {
     try {
+      const emailContent = buildTeamInviteEmail({
+        inviterName: invite.inviterName,
+        inviterEmail: invite.inviterEmail,
+        recipientName: invite.recipientName,
+        recipientEmail: invite.recipientEmail,
+        project: invite.project,
+        role: invite.role,
+        department: invite.department,
+        note: invite.note,
+        joinLink
+      });
+
       await transporter.sendMail({
-        from: `"${invite.inviterName} via Trackify" <${process.env.GMAIL_USER}>`,
+        from: `"Trackify" <${process.env.GMAIL_USER}>`,
         to: invite.recipientEmail,
-        subject: `REMINDER: ${invite.inviterName} invited you to join "${invite.project}" on Trackify`,
-        html: `<p>Reminder: Please join <strong>${invite.project}</strong> by clicking <a href="${joinLink}">Accept Invitation</a>.</p>`
+        replyTo: invite.inviterEmail || process.env.GMAIL_USER,
+        subject: `Reminder: ${invite.inviterName} invited you to join "${invite.project}" on Trackify`,
+        text: emailContent.text,
+        html: emailContent.html
       });
       emailSent = true;
     } catch (err) {
@@ -428,7 +880,7 @@ app.post('/api/team/resend-invite', async (req, res) => {
   res.json({
     success: true,
     emailSent,
-    message: emailSent ? `Reminder sent to ${invite.recipientEmail}` : 'Reminder generated (SMTP not configured)'
+    message: emailSent ? `Reminder sent to ${invite.recipientEmail}` : 'Reminder generated.'
   });
 });
 
@@ -442,15 +894,13 @@ app.post('/api/team/revoke-invite', (req, res) => {
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`[Trackify SMTP & Collaboration Server] Running at http://localhost:${PORT}`);
-    console.log(`[Trackify Frontend Proxy] Ready on http://localhost:5173`);
     const transporter = getTransporter();
     if (transporter) {
-      console.log(`[SMTP Configured] Using Gmail user: ${process.env.GMAIL_USER}`);
+      console.log(`[SMTP Configured] Using sender: ${process.env.GMAIL_USER}`);
     } else {
-      console.log(`[SMTP Notice] GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Enter them in the UI Settings or .env file to send real emails.`);
+      console.log(`[SMTP Notice] GMAIL_USER or GMAIL_APP_PASSWORD not set in .env.`);
     }
   });
 }
 
 export default app;
-

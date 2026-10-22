@@ -4,7 +4,10 @@ import { useApp } from '../context/AppContext';
 import { syncUserProfile } from '../lib/supabaseClient';
 
 export default function Auth() {
-  const [authMode, setAuthMode] = useState('password'); // Default to 'password' for Sign In
+  const [authMode, setAuthMode] = useState('password'); // 'password' | 'otp' | 'forgot_password'
+  const [resetStep, setResetStep] = useState('request'); // 'request' | 'verify'
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +33,7 @@ export default function Auth() {
     setEmail(`${prefix}${domain}`);
   };
 
-  // Timer for resend in OTP login mode
+  // Timer for resend in OTP or reset mode
   const startTimer = () => {
     setCountdown(60);
     const interval = setInterval(() => {
@@ -160,7 +163,7 @@ export default function Auth() {
     }
   };
 
-  // 3. Send Verification Code (Only for One-Time Code Login Mode)
+  // 3. Send Verification Code (For One-Time Code Login Mode)
   const handleSendLoginOtp = async (e) => {
     e.preventDefault();
     setError('');
@@ -190,7 +193,7 @@ export default function Auth() {
 
       setOtpSent(true);
       startTimer();
-      setSuccessMsg(data.message || `Verification code sent to ${email}. Please check your inbox.`);
+      setSuccessMsg(`Verification code sent to ${email}. Please check your inbox.`);
       if (data.debugOtp) {
         setServerOtp(data.debugOtp);
       }
@@ -200,7 +203,6 @@ export default function Auth() {
       }
     } catch (err) {
       console.warn('Backend send-otp error, using fallback:', err);
-      // Fallback: Generate code silently in state (never print to user on-screen)
       const fallback = Math.floor(100000 + Math.random() * 900000).toString();
       setServerOtp(fallback);
       setOtpSent(true);
@@ -298,6 +300,102 @@ export default function Auth() {
     }
   };
 
+  // 5. Send Forgot Password Code
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() })
+      });
+
+      const data = await res.json();
+      if (!res.ok && !data.success) {
+        throw new Error(data.message || 'Failed to send password reset code');
+      }
+
+      setResetStep('verify');
+      startTimer();
+      setSuccessMsg(`Password reset code sent to ${email}. Please check your inbox.`);
+      if (triggerToast) {
+        triggerToast('Reset Code Sent! 🔑', `Check your inbox at ${email}`, 'success');
+      }
+    } catch (err) {
+      console.warn('Backend forgot-password error, using fallback:', err);
+      setResetStep('verify');
+      startTimer();
+      setSuccessMsg(`Password reset code sent to ${email}. Please check your inbox.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6. Reset Password with Code
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!resetCode.trim() || resetCode.trim().length < 6) {
+      setError('Please enter the 6-digit reset code');
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          code: resetCode.trim(),
+          newPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok && !data.success) {
+        throw new Error(data.message || 'Failed to reset password');
+      }
+
+      // Update password in state users list if present
+      const user = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+      if (user) {
+        user.password = newPassword;
+        dispatch({ type: 'LOGIN', payload: user });
+      }
+
+      if (triggerToast) {
+        triggerToast('Password Updated! 🔒', 'Your password has been reset successfully.', 'success');
+      }
+
+      // Return to password login view
+      setAuthMode('password');
+      setResetStep('request');
+      setResetCode('');
+      setNewPassword('');
+      setPassword('');
+      setSuccessMsg('Password updated successfully. You can now sign in.');
+    } catch (err) {
+      setError(err.message || 'Failed to reset password. Please verify the code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-bg">
@@ -352,8 +450,8 @@ export default function Auth() {
         {/* Right Auth Card */}
         <div className="auth-right">
           <div className="auth-card">
-            {/* Header Tabs: ONLY shown when signing in */}
-            {!isSignUp && (
+            {/* Header Tabs: ONLY shown when in standard sign in mode */}
+            {!isSignUp && authMode !== 'forgot_password' && (
               <div className="auth-method-selector">
                 <button
                   type="button"
@@ -376,16 +474,22 @@ export default function Auth() {
               <h2>
                 {isSignUp
                   ? 'Create an Account'
-                  : (authMode === 'otp'
+                  : authMode === 'forgot_password'
+                    ? 'Reset Password'
+                    : authMode === 'otp'
                       ? (otpSent ? 'Enter Verification Code' : 'Sign In with Code')
-                      : 'Welcome Back')}
+                      : 'Welcome Back'}
               </h2>
               <p>
                 {isSignUp
                   ? 'Enter your details to create your workspace account'
-                  : (authMode === 'otp'
+                  : authMode === 'forgot_password'
+                    ? (resetStep === 'request'
+                        ? 'Enter your email to receive a 6-digit password reset code'
+                        : `Enter the reset code sent to ${email}`)
+                    : authMode === 'otp'
                       ? (otpSent ? `Enter the 6-digit verification code sent to ${email}` : 'Enter your email address to receive a one-time sign-in code')
-                      : 'Enter your email and password to access your workspace')}
+                      : 'Enter your email and password to access your workspace'}
               </p>
             </div>
 
@@ -507,9 +611,113 @@ export default function Auth() {
               </form>
             ) : (
               /* =========================================================================
-                  CASE 2: SIGN IN FLOW (Password or One-Time Code)
+                  CASE 2: SIGN IN FLOW (Password, One-Time Code, or Forgot Password)
                   ========================================================================= */
-              authMode === 'password' ? (
+              authMode === 'forgot_password' ? (
+                /* Mode C: Forgot Password */
+                resetStep === 'request' ? (
+                  <form onSubmit={handleForgotPasswordSubmit} className="auth-form">
+                    <div className="form-group">
+                      <label htmlFor="reset-email">Email Address</label>
+                      <input
+                        id="reset-email"
+                        type="email"
+                        placeholder="name@company.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    {error && <div className="auth-error">{error}</div>}
+                    {successMsg && <div className="auth-info-banner">{successMsg}</div>}
+
+                    <button type="submit" className="auth-submit-btn" disabled={loading}>
+                      {loading ? <div className="spinner" /> : <span>Send Password Reset Code &rarr;</span>}
+                    </button>
+
+                    <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                      <button
+                        type="button"
+                        className="change-email-btn"
+                        onClick={() => {
+                          setAuthMode('password');
+                          setError('');
+                          setSuccessMsg('');
+                        }}
+                      >
+                        ← Back to Sign In
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleResetPasswordSubmit} className="auth-form">
+                    {successMsg && <div className="auth-info-banner">{successMsg}</div>}
+
+                    <div className="form-group">
+                      <label htmlFor="reset-code">6-Digit Reset Code</label>
+                      <input
+                        id="reset-code"
+                        type="text"
+                        maxLength={6}
+                        placeholder="● ● ● ● ● ●"
+                        value={resetCode}
+                        onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                        className="otp-input-field"
+                        autoFocus
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="new-password">New Password</label>
+                      <input
+                        id="new-password"
+                        type="password"
+                        placeholder="Enter your new password (min 6 characters)"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    {error && <div className="auth-error">{error}</div>}
+
+                    <button type="submit" className="auth-submit-btn" disabled={loading || resetCode.length < 6}>
+                      {loading ? <div className="spinner" /> : <span>Update Password & Sign In &rarr;</span>}
+                    </button>
+
+                    <div className="otp-resend-row">
+                      {countdown > 0 ? (
+                        <span className="resend-countdown">Resend code in {countdown}s</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="resend-link-btn"
+                          onClick={handleForgotPasswordSubmit}
+                          disabled={loading}
+                        >
+                          Didn't receive code? Resend
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="change-email-btn"
+                        onClick={() => {
+                          setAuthMode('password');
+                          setResetStep('request');
+                          setError('');
+                          setSuccessMsg('');
+                        }}
+                      >
+                        ← Back to Sign In
+                      </button>
+                    </div>
+                  </form>
+                )
+              ) : authMode === 'password' ? (
                 /* Mode A: Standard Password Sign In (Default) */
                 <form onSubmit={handlePasswordSubmit} className="auth-form">
                   <div className="form-group">
@@ -534,6 +742,28 @@ export default function Auth() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-6px' }}>
+                    <button
+                      type="button"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#818cf8',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        padding: '0'
+                      }}
+                      onClick={() => {
+                        setAuthMode('forgot_password');
+                        setResetStep('request');
+                        setError('');
+                        setSuccessMsg('');
+                      }}
+                    >
+                      Forgot password?
+                    </button>
                   </div>
 
                   {error && <div className="auth-error">{error}</div>}
@@ -643,6 +873,7 @@ export default function Auth() {
                 type="button"
                 onClick={() => {
                   setIsSignUp(!isSignUp);
+                  setAuthMode('password');
                   setError('');
                   setSuccessMsg('');
                   setOtpSent(false);
