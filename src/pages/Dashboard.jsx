@@ -43,17 +43,17 @@ const ANALYTICS_DATASETS = {
 // Interactive Weekly Performance Spline Datasets
 const PERFORMANCE_DATASETS = {
   'This Week': {
-    linePath: "M 10 95 C 60 70, 110 90, 160 65 C 210 38, 250 25, 300 45 C 340 65, 380 75, 410 70",
-    areaPath: "M 10 95 C 60 70, 110 90, 160 65 C 210 38, 250 25, 300 45 C 340 65, 380 75, 410 70 L 410 135 L 10 135 Z",
-    prevPath: "M 10 105 C 60 95, 110 80, 160 90 C 210 75, 250 65, 300 80 C 340 90, 380 100, 410 95",
+    linePath: "M 45 110 C 85 102, 95 90, 130 90 C 165 90, 180 76, 215 74 C 255 72, 265 46, 300 44 C 340 42, 350 26, 385 26 C 420 26, 435 66, 470 68 C 505 70, 520 92, 555 92",
+    areaPath: "M 45 110 C 85 102, 95 90, 130 90 C 165 90, 180 76, 215 74 C 255 72, 265 46, 300 44 C 340 42, 350 26, 385 26 C 420 26, 435 66, 470 68 C 505 70, 520 92, 555 92 L 555 145 L 45 145 Z",
+    prevPath: "M 45 122 C 85 115, 95 106, 130 104 C 165 102, 180 90, 215 88 C 255 86, 265 72, 300 70 C 340 68, 350 58, 385 56 C 420 54, 435 80, 470 82 C 505 84, 520 98, 555 100",
     points: [
-      { day: 'Sun', x: 10, y: 95, comp: 8, prev: 6 },
-      { day: 'Mon', x: 75, y: 76, comp: 14, prev: 11 },
-      { day: 'Tue', x: 140, y: 70, comp: 19, prev: 16 },
-      { day: 'Wed', x: 210, y: 38, comp: 28, prev: 20 },
-      { day: 'Thu', x: 275, y: 35, comp: 32, prev: 24 },
-      { day: 'Fri', x: 345, y: 65, comp: 21, prev: 18 },
-      { day: 'Sat', x: 410, y: 70, comp: 15, prev: 12 }
+      { day: 'Sun', x: 45, y: 110, comp: 8, prev: 6 },
+      { day: 'Mon', x: 130, y: 90, comp: 14, prev: 11 },
+      { day: 'Tue', x: 215, y: 74, comp: 19, prev: 16 },
+      { day: 'Wed', x: 300, y: 44, comp: 28, prev: 20 },
+      { day: 'Thu', x: 385, y: 26, comp: 32, prev: 24 },
+      { day: 'Fri', x: 470, y: 68, comp: 21, prev: 18 },
+      { day: 'Sat', x: 555, y: 92, comp: 15, prev: 12 }
     ],
     stats: {
       completed: 32,
@@ -68,17 +68,17 @@ const PERFORMANCE_DATASETS = {
     }
   },
   'Last Week': {
-    linePath: "M 10 105 C 60 90, 110 80, 160 75 C 210 55, 250 45, 300 60 C 340 75, 380 85, 410 80",
-    areaPath: "M 10 105 C 60 90, 110 80, 160 75 C 210 55, 250 45, 300 60 C 340 75, 380 85, 410 80 L 410 135 L 10 135 Z",
-    prevPath: "M 10 115 C 60 105, 110 95, 160 100 C 210 85, 250 75, 300 90 C 340 100, 380 110, 410 105",
+    linePath: "M 45 120 C 85 114, 95 104, 130 102 C 165 100, 180 88, 215 86 C 255 84, 265 64, 300 62 C 340 60, 350 50, 385 48 C 420 46, 435 76, 470 78 C 505 80, 520 96, 555 98",
+    areaPath: "M 45 120 C 85 114, 95 104, 130 102 C 165 100, 180 88, 215 86 C 255 84, 265 64, 300 62 C 340 60, 350 50, 385 48 C 420 46, 435 76, 470 78 C 505 80, 520 96, 555 98 L 555 145 L 45 145 Z",
+    prevPath: "M 45 130 C 85 124, 95 114, 130 112 C 165 110, 180 98, 215 96 C 255 94, 265 78, 300 76 C 340 74, 350 64, 385 62 C 420 60, 435 86, 470 88 C 505 90, 520 106, 555 108",
     points: [
-      { day: 'Sun', x: 10, y: 105, comp: 6, prev: 5 },
-      { day: 'Mon', x: 75, y: 88, comp: 11, prev: 9 },
-      { day: 'Tue', x: 140, y: 80, comp: 16, prev: 13 },
-      { day: 'Wed', x: 210, y: 55, comp: 22, prev: 17 },
-      { day: 'Thu', x: 275, y: 48, comp: 25, prev: 21 },
-      { day: 'Fri', x: 345, y: 72, comp: 17, prev: 14 },
-      { day: 'Sat', x: 410, y: 80, comp: 12, prev: 10 }
+      { day: 'Sun', x: 45, y: 120, comp: 6, prev: 5 },
+      { day: 'Mon', x: 130, y: 102, comp: 11, prev: 9 },
+      { day: 'Tue', x: 215, y: 86, comp: 16, prev: 13 },
+      { day: 'Wed', x: 300, y: 62, comp: 22, prev: 17 },
+      { day: 'Thu', x: 385, y: 48, comp: 25, prev: 21 },
+      { day: 'Fri', x: 470, y: 78, comp: 17, prev: 14 },
+      { day: 'Sat', x: 555, y: 98, comp: 12, prev: 10 }
     ],
     stats: {
       completed: 25,
@@ -844,9 +844,12 @@ export default function Dashboard() {
       {/* Row 3: Team Collaboration + Project Progress (New Concentric Donut) + Recent Activity */}
       <div className="dashboard-grid-3col">
         {/* Card 1: Team Collaboration */}
-        <div className="dashboard-widget-card">
+        <div className="dashboard-widget-card team-collaboration-card">
           <div className="widget-header-row">
-            <h3>Team Collaboration</h3>
+            <div>
+              <h3>Team Collaboration</h3>
+              <span className="widget-sub-hint">5 active contributors across sprints</span>
+            </div>
             <button className="btn-add-member-pill" onClick={() => setShowAddMember(true)}>
               + Add Member
             </button>
@@ -871,6 +874,17 @@ export default function Dashboard() {
                 </span>
               </div>
             ))}
+          </div>
+
+          {/* Clean Collaboration Summary Footer */}
+          <div className="collab-summary-footer">
+            <div className="collab-footer-meta">
+              <span className="collab-online-badge"><span className="pulse-dot-green" /> All 5 Active</span>
+              <span className="collab-totals-text">28 Total Tasks</span>
+            </div>
+            <button className="collab-manage-team-btn" onClick={() => navigate('/team')}>
+              Team Hub →
+            </button>
           </div>
         </div>
 
@@ -1100,9 +1114,12 @@ export default function Dashboard() {
         </div>
 
         {/* Card 3: Recent Activity */}
-        <div className="dashboard-widget-card">
+        <div className="dashboard-widget-card recent-activity-card">
           <div className="widget-header-row">
-            <h3>Recent Activity</h3>
+            <div>
+              <h3>Recent Activity</h3>
+              <span className="widget-sub-hint">Realtime actions & audit log</span>
+            </div>
             <button className="widget-link-btn" onClick={() => navigate('/tasks')}>
               View all →
             </button>
@@ -1110,11 +1127,12 @@ export default function Dashboard() {
 
           <div className="recent-activity-feed-wrap">
             {[
-              { id: '1', initials: 'MS', color: '#06b6d4', user: 'Mateo Silva', action: 'moved Passkey Sign In to In Progress', email: 'mateo@trackify.com', time: '5 mins ago' },
-              { id: '2', initials: 'PR', color: '#f43f5e', user: 'Priya Raman', action: 'completed Design System Tokens', email: 'priya@trackify.com', time: '18 mins ago' },
-              { id: '3', initials: 'HK', color: '#8b5cf6', user: 'Hana Kobayashi', action: 'created a new task UI Improvements', email: 'hana@trackify.com', time: '1 hour ago' },
-              { id: '4', initials: 'OM', color: '#f59e0b', user: 'Owen Mercer', action: 'assigned Marketing Assets to Sophia Lee', email: 'owen@trackify.com', time: '2 hours ago' },
-              { id: '5', initials: 'SL', color: '#10b981', user: 'Sophia Lee', action: 'moved Mobile App Mockups to In Review', email: 'sophia@trackify.com', time: '3 hours ago' },
+              { id: '1', initials: 'MS', color: '#06b6d4', user: 'Mateo Silva', action: 'moved Passkey Sign In to In Progress', email: 'mateo@trackify.com', time: '5m ago' },
+              { id: '2', initials: 'PR', color: '#f43f5e', user: 'Priya Raman', action: 'completed Design System Tokens', email: 'priya@trackify.com', time: '18m ago' },
+              { id: '3', initials: 'HK', color: '#8b5cf6', user: 'Hana Kobayashi', action: 'created a new task UI Improvements', email: 'hana@trackify.com', time: '1h ago' },
+              { id: '4', initials: 'OM', color: '#f59e0b', user: 'Owen Mercer', action: 'assigned Marketing Assets to Sophia Lee', email: 'owen@trackify.com', time: '2h ago' },
+              { id: '5', initials: 'SL', color: '#10b981', user: 'Sophia Lee', action: 'moved Mobile App Mockups to In Review', email: 'sophia@trackify.com', time: '3h ago' },
+              { id: '6', initials: 'AC', color: '#3b82f6', user: 'Alex Chen', action: 'joined Trackify team via email invite', email: 'alex@trackify.com', time: '4h ago' },
             ].map(act => (
               <div key={act.id} className="activity-feed-row">
                 <div className="activity-avatar" style={{ background: act.color }}>
@@ -1129,6 +1147,14 @@ export default function Dashboard() {
                 <span className="activity-time-stamp">{act.time}</span>
               </div>
             ))}
+          </div>
+
+          {/* Activity Live Pulse Bar */}
+          <div className="activity-live-footer">
+            <span className="activity-live-indicator">
+              <span className="pulse-dot-cyan" /> Live sync active
+            </span>
+            <span className="activity-sync-tag">Encrypted channel</span>
           </div>
         </div>
       </div>
@@ -1159,26 +1185,27 @@ export default function Dashboard() {
                 {/* Smooth Spline Wave Area Chart */}
                 <div className="performance-spline-chart-box">
                   <div className="spline-chart-with-axis">
-                    <div className="spline-y-axis">
-                      <span>30</span>
-                      <span>20</span>
-                      <span>10</span>
-                      <span>0</span>
-                    </div>
-
                     <div className="spline-svg-wrapper">
-                      <svg className="spline-svg" viewBox="0 0 420 140" preserveAspectRatio="none">
+                      <svg className="spline-svg" viewBox="0 0 600 160">
                         <defs>
                           <linearGradient id="perfWaveGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
-                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.32" />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
                           </linearGradient>
                         </defs>
 
-                        {/* Light reference gridlines */}
-                        <line x1="0" y1="35" x2="420" y2="35" stroke="var(--border)" strokeDasharray="3 3" opacity="0.6" />
-                        <line x1="0" y1="70" x2="420" y2="70" stroke="var(--border)" strokeDasharray="3 3" opacity="0.6" />
-                        <line x1="0" y1="105" x2="420" y2="105" stroke="var(--border)" strokeDasharray="3 3" opacity="0.6" />
+                        {/* Y-Axis Reference Gridlines and Labels */}
+                        <line x1="38" y1="30" x2="570" y2="30" stroke="var(--border)" strokeDasharray="3 3" opacity="0.6" />
+                        <text x="32" y="34" textAnchor="end" className="spline-axis-text">30</text>
+
+                        <line x1="38" y1="70" x2="570" y2="70" stroke="var(--border)" strokeDasharray="3 3" opacity="0.6" />
+                        <text x="32" y="74" textAnchor="end" className="spline-axis-text">20</text>
+
+                        <line x1="38" y1="110" x2="570" y2="110" stroke="var(--border)" strokeDasharray="3 3" opacity="0.6" />
+                        <text x="32" y="114" textAnchor="end" className="spline-axis-text">10</text>
+
+                        <line x1="38" y1="145" x2="570" y2="145" stroke="var(--border)" opacity="0.8" />
+                        <text x="32" y="148" textAnchor="end" className="spline-axis-text">0</text>
 
                         {/* Filled Area */}
                         <path
@@ -1204,20 +1231,42 @@ export default function Dashboard() {
                           strokeLinecap="round"
                         />
 
-                        {/* Interactive Highlight Dots */}
+                        {/* Interactive Highlight Dots and Integrated Day Labels */}
                         {currentPerf.points.map((pt, i) => (
                           <g key={i}>
+                            {/* Vertical Tick Guide */}
+                            <line
+                              x1={pt.x}
+                              y1="25"
+                              x2={pt.x}
+                              y2="145"
+                              stroke={hoveredPerfPoint?.day === pt.day ? "rgba(37, 99, 235, 0.4)" : "rgba(148, 163, 184, 0.15)"}
+                              strokeDasharray={hoveredPerfPoint?.day === pt.day ? "none" : "2 2"}
+                              strokeWidth={hoveredPerfPoint?.day === pt.day ? "1.5" : "1"}
+                            />
+
+                            {/* Data Point Dot */}
                             <circle
                               cx={pt.x}
                               cy={pt.y}
-                              r={hoveredPerfPoint?.day === pt.day ? "6.5" : "4.5"}
-                              fill="#2563eb"
+                              r={hoveredPerfPoint?.day === pt.day ? "7" : "5"}
+                              fill={hoveredPerfPoint?.day === pt.day ? "#2563eb" : "#3b82f6"}
                               stroke="#ffffff"
                               strokeWidth={hoveredPerfPoint?.day === pt.day ? "3" : "2"}
                               className="spline-point-dot"
                               onMouseEnter={() => setHoveredPerfPoint(pt)}
                               onMouseLeave={() => setHoveredPerfPoint(null)}
                             />
+
+                            {/* Aligned Day Label */}
+                            <text
+                              x={pt.x}
+                              y="158"
+                              textAnchor="middle"
+                              className={`spline-day-text ${hoveredPerfPoint?.day === pt.day ? 'active-day' : ''}`}
+                            >
+                              {pt.day}
+                            </text>
                           </g>
                         ))}
                       </svg>
@@ -1227,8 +1276,8 @@ export default function Dashboard() {
                         <div
                           className="spline-hover-tooltip"
                           style={{
-                            left: `${(hoveredPerfPoint.x / 420) * 100}%`,
-                            top: `${(hoveredPerfPoint.y / 140) * 100}%`
+                            left: `${(hoveredPerfPoint.x / 600) * 100}%`,
+                            top: `${(hoveredPerfPoint.y / 160) * 100}%`
                           }}
                         >
                           <strong>{hoveredPerfPoint.day}</strong>: {hoveredPerfPoint.comp} completed
@@ -1236,16 +1285,6 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
-                  </div>
-
-                  <div className="spline-x-labels">
-                    <span>Sun</span>
-                    <span>Mon</span>
-                    <span>Tue</span>
-                    <span>Wed</span>
-                    <span>Thu</span>
-                    <span>Fri</span>
-                    <span>Sat</span>
                   </div>
 
                   <div className="spline-bottom-legend">
@@ -1257,22 +1296,28 @@ export default function Dashboard() {
                 {/* Performance Stats Badges */}
                 <div className="performance-stats-group">
                   <div className="perf-metric-box">
-                    <span className="perf-badge green">{currentPerf.stats.completedTrend}</span>
-                    <span className="perf-label">Tasks Completed</span>
+                    <div className="perf-metric-header">
+                      <span className="perf-label">Tasks Completed</span>
+                      <span className="perf-badge green">{currentPerf.stats.completedTrend}</span>
+                    </div>
                     <span className="perf-huge-num">{currentPerf.stats.completed}</span>
                     <span className="perf-comparison">{currentPerf.stats.completedVs}</span>
                   </div>
 
                   <div className="perf-metric-box">
-                    <span className="perf-badge blue">{currentPerf.stats.createdTrend}</span>
-                    <span className="perf-label">Tasks Created</span>
+                    <div className="perf-metric-header">
+                      <span className="perf-label">Tasks Created</span>
+                      <span className="perf-badge blue">{currentPerf.stats.createdTrend}</span>
+                    </div>
                     <span className="perf-huge-num">{currentPerf.stats.created}</span>
                     <span className="perf-comparison">{currentPerf.stats.createdVs}</span>
                   </div>
 
                   <div className="perf-metric-box">
-                    <span className="perf-badge red">{currentPerf.stats.overdueTrend}</span>
-                    <span className="perf-label">Overdue Tasks</span>
+                    <div className="perf-metric-header">
+                      <span className="perf-label">Overdue Tasks</span>
+                      <span className="perf-badge red">{currentPerf.stats.overdueTrend}</span>
+                    </div>
                     <span className="perf-huge-num">{currentPerf.stats.overdue}</span>
                     <span className="perf-comparison">{currentPerf.stats.overdueVs}</span>
                   </div>
