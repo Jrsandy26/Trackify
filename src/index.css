@@ -2597,24 +2597,33 @@ button { cursor: pointer; border: none; background: none; }
 
 .auth-form .form-group label { color: #94a3b8; font-size: 0.82rem; }
 
-.auth-form input {
+.auth-form input,
+.auth-form select {
   padding: 12px 14px;
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.05);
+  background: rgba(30, 27, 75, 0.65);
   color: #fff;
   font-size: 0.9rem;
   outline: none;
   transition: all var(--transition);
   width: 100%;
+  box-sizing: border-box;
+}
+
+.auth-form select option {
+  background: #1e1b4b;
+  color: #ffffff;
+  padding: 8px;
 }
 
 .auth-form input::placeholder { color: #64748b; }
 
-.auth-form input:focus {
+.auth-form input:focus,
+.auth-form select:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-  background: rgba(255,255,255,0.08);
+  background: rgba(30, 27, 75, 0.9);
 }
 
 .auth-error {

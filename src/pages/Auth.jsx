@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { syncUserProfile } from '../lib/supabaseClient';
 
 export default function Auth() {
-  const [authMode, setAuthMode] = useState('otp'); // 'otp' | 'password'
+  const [authMode, setAuthMode] = useState('otp'); // 'otp' | 'password' for Sign In
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [department, setDepartment] = useState('Engineering');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpHint, setOtpHint] = useState('');
@@ -41,18 +44,37 @@ export default function Auth() {
     }, 1000);
   };
 
-  // 1. Send OTP via Gmail SMTP
+  // 1. Account Creation & Send OTP / Login Send OTP
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
+
     if (!email.trim()) {
-      setError('Please enter your email address');
+      setError('Please enter your email ID');
       return;
     }
-    if (isSignUp && !name.trim()) {
-      setError('Please enter your full name');
-      return;
+
+    if (isSignUp) {
+      if (!name.trim()) {
+        setError('Please enter your full name');
+        return;
+      }
+      if (!designation.trim()) {
+        setError('Please enter your designation');
+        return;
+      }
+      if (!department) {
+        setError('Please select your department');
+        return;
+      }
+
+      // Check if user already exists
+      const existing = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+      if (existing) {
+        setError('An account with this email already exists. Please Sign In instead.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -148,9 +170,9 @@ export default function Auth() {
         id: `u${Date.now()}`,
         name: name.trim() || email.split('@')[0],
         email: email.trim(),
-        role: 'Team Lead',
-        department: 'Product',
-        bio: 'Verified Trackify Collaborator',
+        role: designation.trim() || 'Team Member',
+        department: department || 'Engineering',
+        bio: `${designation.trim() || 'Team Member'} · ${department || 'Engineering'}`,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         avatar: null,
         initials: initials || 'TU',
@@ -159,12 +181,26 @@ export default function Auth() {
 
       if (!existingUser) {
         dispatch({ type: 'SIGNUP', payload: userPayload });
+        try {
+          await syncUserProfile(userPayload);
+        } catch (syncErr) {
+          console.warn('[Supabase] sync error on signup:', syncErr);
+        }
       } else {
         dispatch({ type: 'LOGIN', payload: userPayload });
+        try {
+          await syncUserProfile(userPayload);
+        } catch (syncErr) {
+          console.warn('[Supabase] sync error on login:', syncErr);
+        }
       }
 
       if (triggerToast) {
-        triggerToast('2-Step Verified! 🛡️', `Welcome, ${userPayload.name}!`, 'success');
+        triggerToast(
+          isSignUp ? 'Account Created! 🎉' : '2-Step Verified! 🛡️',
+          `Welcome to Trackify, ${userPayload.name}!`,
+          'success'
+        );
       }
 
       navigate('/');
@@ -175,53 +211,32 @@ export default function Auth() {
     }
   };
 
-  // 3. Password Fallback Handler
-  const handlePasswordSubmit = (e) => {
+  // 3. Password Fallback Handler for Sign In
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      if (isSignUp) {
-        if (!name || !email || !password) {
-          setError('Please fill in all fields');
-          setLoading(false);
-          return;
-        }
-        if (state.users.find(u => u.email === email)) {
-          setError('Email already exists');
-          setLoading(false);
-          return;
-        }
-        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-        const colors = ['#6366f1', '#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6'];
-        const newUser = {
-          id: `u${Date.now()}`,
-          name,
-          email,
-          password,
-          role: 'Team Member',
-          department: 'General',
-          bio: '',
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          avatar: null,
-          initials,
-          color: colors[Math.floor(Math.random() * colors.length)]
-        };
-        dispatch({ type: 'SIGNUP', payload: newUser });
-        navigate('/');
-      } else {
-        const user = state.users.find(u => u.email === email && u.password === password);
-        if (!user) {
-          setError('Invalid email or password');
-          setLoading(false);
-          return;
-        }
-        dispatch({ type: 'LOGIN', payload: user });
-        navigate('/');
+    try {
+      const user = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password);
+      if (!user) {
+        setError('Invalid email or password');
+        setLoading(false);
+        return;
       }
+      dispatch({ type: 'LOGIN', payload: user });
+      try {
+        await syncUserProfile(user);
+      } catch (syncErr) {
+        console.warn('[Supabase] sync error on password login:', syncErr);
+      }
+      if (triggerToast) {
+        triggerToast('Welcome Back! 👋', `Signed in as ${user.name}`, 'success');
+      }
+      navigate('/');
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   return (
@@ -244,7 +259,7 @@ export default function Auth() {
           </div>
 
           <h2 className="auth-tagline">
-            Manage projects with <span>2-Step Email Verification</span> & Realtime Team Sync
+            Manage projects with <span>Realtime Team Sync</span> & 2-Step Email Verification
           </h2>
           <p className="auth-description">
             Sign in securely using your personal Gmail or Outlook address. Dispatches real SMTP OTP verification and invitations to collaborate.
@@ -278,58 +293,67 @@ export default function Auth() {
         {/* Right Auth Card */}
         <div className="auth-right">
           <div className="auth-card">
-            {/* Header Tabs: 2-Step OTP vs Password */}
-            <div className="auth-method-selector">
-              <button
-                type="button"
-                className={`auth-method-btn ${authMode === 'otp' ? 'active' : ''}`}
-                onClick={() => { setAuthMode('otp'); setError(''); }}
-              >
-                🛡️ 2-Step OTP Login
-              </button>
-              <button
-                type="button"
-                className={`auth-method-btn ${authMode === 'password' ? 'active' : ''}`}
-                onClick={() => { setAuthMode('password'); setError(''); }}
-              >
-                🔑 Password Login
-              </button>
-            </div>
+            {/* Header Tabs: ONLY show when signing in (hidden during account creation) */}
+            {!isSignUp && (
+              <div className="auth-method-selector">
+                <button
+                  type="button"
+                  className={`auth-method-btn ${authMode === 'otp' ? 'active' : ''}`}
+                  onClick={() => { setAuthMode('otp'); setError(''); }}
+                >
+                  🛡️ 2-Step OTP
+                </button>
+                <button
+                  type="button"
+                  className={`auth-method-btn ${authMode === 'password' ? 'active' : ''}`}
+                  onClick={() => { setAuthMode('password'); setError(''); }}
+                >
+                  🔑 Password
+                </button>
+              </div>
+            )}
 
             <div className="auth-card-header">
               <h2>
-                {authMode === 'otp'
-                  ? (otpSent ? 'Enter 2-Step Verification Code' : isSignUp ? 'Create Trackify Account' : 'Secure Email Sign-In')
-                  : (isSignUp ? 'Create Account' : 'Welcome Back')}
+                {isSignUp
+                  ? (otpSent ? 'Verify Email' : 'Create Account')
+                  : (authMode === 'otp'
+                      ? (otpSent ? 'Enter Verification Code' : 'Sign In')
+                      : 'Sign In')}
               </h2>
               <p>
-                {authMode === 'otp'
-                  ? (otpSent ? `Check your inbox at ${email} for your 6-digit code` : 'Use your Gmail or Outlook email with OTP verification')
-                  : (isSignUp ? 'Start managing your projects today' : 'Sign in to your workspace')}
+                {isSignUp
+                  ? (otpSent ? `Check your inbox at ${email} for your 6-digit code` : 'Enter your details to create your workspace account')
+                  : (authMode === 'otp'
+                      ? (otpSent ? `Check your inbox at ${email} for your 6-digit code` : 'Sign in using your personal Gmail or Outlook address')
+                      : 'Enter your email and password to access your workspace')}
               </p>
             </div>
 
-            {/* FLOW 1: 2-STEP OTP VERIFICATION (GMAIL & OUTLOOK) */}
-            {authMode === 'otp' ? (
+            {/* =========================================================================
+                CASE 1: ACCOUNT CREATION FLOW (Dedicated: Name, Email ID, Designation, Department)
+                ========================================================================= */}
+            {isSignUp ? (
               !otpSent ? (
-                /* Step 1: Request OTP */
+                /* Step 1: Account Creation Form */
                 <form onSubmit={handleSendOtp} className="auth-form">
-                  {isSignUp && (
-                    <div className="form-group">
-                      <label htmlFor="auth-name">Full Name *</label>
-                      <input
-                        id="auth-name"
-                        type="text"
-                        placeholder="e.g. Sandeep Sai"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                      />
-                    </div>
-                  )}
-
+                  {/* 1. Name */}
                   <div className="form-group">
-                    <label htmlFor="auth-email">Email Address (Gmail / Outlook) *</label>
+                    <label htmlFor="auth-name">Full Name *</label>
+                    <input
+                      id="auth-name"
+                      type="text"
+                      placeholder="e.g. Sandeep Sai"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* 2. Email ID */}
+                  <div className="form-group">
+                    <label htmlFor="auth-email">Email ID *</label>
                     <input
                       id="auth-email"
                       type="email"
@@ -337,7 +361,6 @@ export default function Auth() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      autoFocus
                     />
                     
                     {/* Domain Suggestion Chips */}
@@ -356,18 +379,63 @@ export default function Auth() {
                     </div>
                   </div>
 
+                  {/* 3. Designation */}
+                  <div className="form-group">
+                    <label htmlFor="auth-designation">Designation *</label>
+                    <input
+                      id="auth-designation"
+                      type="text"
+                      list="designation-suggestions"
+                      placeholder="e.g. Senior Frontend Engineer"
+                      value={designation}
+                      onChange={(e) => setDesignation(e.target.value)}
+                      required
+                    />
+                    <datalist id="designation-suggestions">
+                      <option value="Senior Frontend Engineer" />
+                      <option value="Fullstack Developer" />
+                      <option value="Backend Engineer" />
+                      <option value="UI/UX Designer" />
+                      <option value="Product Manager" />
+                      <option value="Project Lead" />
+                      <option value="DevOps Engineer" />
+                      <option value="QA Engineer" />
+                      <option value="Team Member" />
+                    </datalist>
+                  </div>
+
+                  {/* 4. Department */}
+                  <div className="form-group">
+                    <label htmlFor="auth-department">Department *</label>
+                    <select
+                      id="auth-department"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                      required
+                    >
+                      <option value="Engineering">Engineering</option>
+                      <option value="Product & Design">Product & Design</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Operations">Operations</option>
+                      <option value="Sales">Sales</option>
+                      <option value="Human Resources">Human Resources</option>
+                      <option value="Finance">Finance</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+
                   {error && <div className="auth-error">{error}</div>}
 
                   <button type="submit" className="auth-submit-btn" disabled={loading}>
                     {loading ? (
                       <span className="spinner" />
                     ) : (
-                      <span>Send 2-Step Verification Code &rarr;</span>
+                      <span>Create Account &rarr;</span>
                     )}
                   </button>
                 </form>
               ) : (
-                /* Step 2: Enter 6-digit OTP */
+                /* Step 2: Verification Code for Signup */
                 <form onSubmit={handleVerifyOtp} className="auth-form">
                   {successMsg && <div className="auth-info-banner">{successMsg}</div>}
 
@@ -386,7 +454,7 @@ export default function Auth() {
                   )}
 
                   <div className="form-group">
-                    <label htmlFor="auth-otp-input">6-Digit Code</label>
+                    <label htmlFor="auth-otp-input">6-Digit Verification Code</label>
                     <input
                       id="auth-otp-input"
                       type="text"
@@ -402,7 +470,7 @@ export default function Auth() {
                   {error && <div className="auth-error">{error}</div>}
 
                   <button type="submit" className="auth-submit-btn" disabled={loading || otp.length < 6}>
-                    {loading ? <span className="spinner" /> : <span>Verify & Access Trackify &rarr;</span>}
+                    {loading ? <span className="spinner" /> : <span>Verify & Complete Account Creation &rarr;</span>}
                   </button>
 
                   <div className="otp-resend-row">
@@ -423,55 +491,156 @@ export default function Auth() {
                       className="change-email-btn"
                       onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
                     >
-                      Change Email
+                      ← Edit Details
                     </button>
                   </div>
                 </form>
               )
             ) : (
-              /* FLOW 2: STANDARD PASSWORD LOGIN (DEMO) */
-              <form onSubmit={handlePasswordSubmit} className="auth-form">
-                {isSignUp && (
+              /* =========================================================================
+                  CASE 2: SIGN IN FLOW (OTP or Password)
+                  ========================================================================= */
+              authMode === 'otp' ? (
+                !otpSent ? (
+                  /* Step 1: Sign In via 2-Step OTP */
+                  <form onSubmit={handleSendOtp} className="auth-form">
+                    <div className="form-group">
+                      <label htmlFor="login-email">Email Address (Gmail / Outlook) *</label>
+                      <input
+                        id="login-email"
+                        type="email"
+                        placeholder="e.g. yourname@gmail.com or @outlook.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoFocus
+                      />
+                      
+                      {/* Domain Suggestion Chips */}
+                      <div className="auth-domain-chips">
+                        <span className="chip-label">Quick select:</span>
+                        {domains.map((dom) => (
+                          <button
+                            key={dom}
+                            type="button"
+                            className="domain-chip"
+                            onClick={() => handleDomainClick(dom)}
+                          >
+                            {dom}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {error && <div className="auth-error">{error}</div>}
+
+                    <button type="submit" className="auth-submit-btn" disabled={loading}>
+                      {loading ? (
+                        <span className="spinner" />
+                      ) : (
+                        <span>Sign In &rarr;</span>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  /* Step 2: Enter 6-digit OTP for Sign In */
+                  <form onSubmit={handleVerifyOtp} className="auth-form">
+                    {successMsg && <div className="auth-info-banner">{successMsg}</div>}
+
+                    {otpHint && (
+                      <div className="auth-otp-badge-box">
+                        <span>Verification Code:</span>
+                        <strong className="otp-display-code">{otpHint}</strong>
+                        <button
+                          type="button"
+                          className="btn-autofill-otp"
+                          onClick={() => setOtp(otpHint)}
+                        >
+                          Auto-fill
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label htmlFor="auth-otp-input">6-Digit Code</label>
+                      <input
+                        id="auth-otp-input"
+                        type="text"
+                        maxLength={6}
+                        placeholder="● ● ● ● ● ●"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                        className="otp-input-field"
+                        autoFocus
+                      />
+                    </div>
+
+                    {error && <div className="auth-error">{error}</div>}
+
+                    <button type="submit" className="auth-submit-btn" disabled={loading || otp.length < 6}>
+                      {loading ? <span className="spinner" /> : <span>Verify & Sign In &rarr;</span>}
+                    </button>
+
+                    <div className="otp-resend-row">
+                      {countdown > 0 ? (
+                        <span className="resend-countdown">Resend code in {countdown}s</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="resend-link-btn"
+                          onClick={handleSendOtp}
+                          disabled={loading}
+                        >
+                          Didn't receive code? Resend
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="change-email-btn"
+                        onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
+                      >
+                        Change Email
+                      </button>
+                    </div>
+                  </form>
+                )
+              ) : (
+                /* Step 1: Sign In via Password */
+                <form onSubmit={handlePasswordSubmit} className="auth-form">
                   <div className="form-group">
-                    <label htmlFor="pwd-name">Full Name</label>
+                    <label htmlFor="pwd-email">Email Address</label>
                     <input
-                      id="pwd-name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      id="pwd-email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      autoFocus
                     />
                   </div>
-                )}
-                <div className="form-group">
-                  <label htmlFor="pwd-email">Email Address</label>
-                  <input
-                    id="pwd-email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="pwd-password">Password</label>
-                  <input
-                    id="pwd-password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
+                  <div className="form-group">
+                    <label htmlFor="pwd-password">Password</label>
+                    <input
+                      id="pwd-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                {error && <div className="auth-error">{error}</div>}
+                  {error && <div className="auth-error">{error}</div>}
 
-                <button type="submit" className="auth-submit-btn" disabled={loading}>
-                  {loading ? <div className="spinner" /> : isSignUp ? 'Create Account' : 'Sign In'}
-                </button>
-              </form>
+                  <button type="submit" className="auth-submit-btn" disabled={loading}>
+                    {loading ? <div className="spinner" /> : <span>Sign In &rarr;</span>}
+                  </button>
+                </form>
+              )
             )}
 
+            {/* Bottom Switcher: Sign In <-> Create Account */}
             <p className="auth-switch">
               {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
               <button
@@ -479,6 +648,7 @@ export default function Auth() {
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setError('');
+                  setSuccessMsg('');
                   setOtpSent(false);
                   setOtp('');
                 }}
