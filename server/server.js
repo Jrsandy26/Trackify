@@ -416,14 +416,19 @@ app.post('/api/team/revoke-invite', (req, res) => {
   res.json({ success: true, message: 'Invitation revoked successfully' });
 });
 
-// Start Express Server
-app.listen(PORT, () => {
-  console.log(`[Trackify SMTP & Collaboration Server] Running at http://localhost:${PORT}`);
-  console.log(`[Trackify Frontend Proxy] Ready on http://localhost:5173`);
-  const transporter = getTransporter();
-  if (transporter) {
-    console.log(`[SMTP Configured] Using Gmail user: ${process.env.GMAIL_USER}`);
-  } else {
-    console.log(`[SMTP Notice] GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Enter them in the UI Settings or .env file to send real emails.`);
-  }
-});
+// Start Express Server (Standalone or Vercel Serverless)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[Trackify SMTP & Collaboration Server] Running at http://localhost:${PORT}`);
+    console.log(`[Trackify Frontend Proxy] Ready on http://localhost:5173`);
+    const transporter = getTransporter();
+    if (transporter) {
+      console.log(`[SMTP Configured] Using Gmail user: ${process.env.GMAIL_USER}`);
+    } else {
+      console.log(`[SMTP Notice] GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Enter them in the UI Settings or .env file to send real emails.`);
+    }
+  });
+}
+
+export default app;
+

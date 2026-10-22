@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import {
+  getSupabaseCredentials,
+  saveSupabaseCredentials,
+  isSupabaseConfigured,
+  syncUserProfile
+} from '../lib/supabaseClient';
 
 const accentColors = [
   { name: 'Indigo', value: '#6366f1' },
@@ -23,6 +29,18 @@ export default function Settings() {
     bio: state.currentUser?.bio || ''
   });
   const [saved, setSaved] = useState(false);
+
+  // Supabase Cloud Storage State
+  const [supabaseForm, setSupabaseForm] = useState(() => {
+    const creds = getSupabaseCredentials();
+    return {
+      url: creds.url,
+      key: creds.key,
+      isConfigured: creds.isConfigured
+    };
+  });
+  const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState(null);
 
   // SMTP Settings State
   const [smtpConfig, setSmtpConfig] = useState({
@@ -102,9 +120,34 @@ export default function Settings() {
     }
   };
 
+  const handleSupabaseSave = async (e) => {
+    e.preventDefault();
+    setSupabaseLoading(true);
+    setSupabaseStatus(null);
+    try {
+      saveSupabaseCredentials(supabaseForm.url, supabaseForm.key);
+      const isOk = isSupabaseConfigured();
+      setSupabaseForm(prev => ({ ...prev, isConfigured: isOk }));
+      if (isOk) {
+        if (state.currentUser) {
+          await syncUserProfile(state.currentUser);
+        }
+        setSupabaseStatus({ success: true, message: 'Supabase credentials saved & connected successfully!' });
+        if (triggerToast) triggerToast('Supabase Connected ⚡', 'Cloud database is active and ready for sync.', 'success');
+      } else {
+        setSupabaseStatus({ success: false, message: 'Please provide a valid Supabase URL and Anon Key.' });
+      }
+    } catch (err) {
+      setSupabaseStatus({ success: false, message: 'Error: ' + err.message });
+    } finally {
+      setSupabaseLoading(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profile', icon: '👤' },
     { id: 'smtp', label: 'Gmail SMTP & Email', icon: '✉️' },
+    { id: 'storage', label: 'Database & Supabase', icon: '⚡' },
     { id: 'notifications', label: 'Notifications', icon: '🔔' },
     { id: 'appearance', label: 'Appearance', icon: '🎨' },
   ];
@@ -263,7 +306,114 @@ export default function Settings() {
             </div>
           )}
 
-          {/* 3. Notifications Tab */}
+          {/* 3. Database & Supabase Cloud Storage Tab */}
+          {activeTab === 'storage' && (
+            <div className="settings-section">
+              <div className="settings-section-header">
+                <h2>Database & Cloud Storage (Supabase)</h2>
+                <p>Sync tasks, projects, team members, and user state to your Supabase PostgreSQL cloud database.</p>
+              </div>
+
+              {/* Status Banner */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '14px 18px',
+                  borderRadius: '12px',
+                  background: supabaseForm.isConfigured ? 'rgba(16, 185, 129, 0.08)' : 'rgba(100, 116, 139, 0.08)',
+                  border: `1px solid ${supabaseForm.isConfigured ? 'rgba(16, 185, 129, 0.25)' : 'rgba(100, 116, 139, 0.2)'}`,
+                  marginBottom: '20px'
+                }}
+              >
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: supabaseForm.isConfigured ? '#10b981' : '#64748b',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.1rem',
+                    flexShrink: 0
+                  }}
+                >
+                  ⚡
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 2px 0', fontSize: '0.9rem', color: 'var(--text)' }}>
+                    {supabaseForm.isConfigured ? 'Supabase Cloud Storage Active' : 'Offline / LocalStorage Fallback Active'}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {supabaseForm.isConfigured
+                      ? 'All workspace tasks, projects, and users are syncing securely to your Supabase PostgreSQL cloud database.'
+                      : 'Running in resilient local storage mode. Enter your Supabase Project URL and Anon key below to activate cloud persistence.'}
+                  </p>
+                </div>
+              </div>
+
+              {supabaseStatus && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    marginBottom: '18px',
+                    fontSize: '0.84rem',
+                    background: supabaseStatus.success ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    color: supabaseStatus.success ? '#15803d' : '#b91c1c',
+                    border: `1px solid ${supabaseStatus.success ? '#86efac' : '#fca5a5'}`
+                  }}
+                >
+                  {supabaseStatus.message}
+                </div>
+              )}
+
+              <form onSubmit={handleSupabaseSave} className="settings-form smtp-form">
+                <div className="form-group">
+                  <label>Supabase Project URL *</label>
+                  <input
+                    type="url"
+                    placeholder="https://your-project-id.supabase.co"
+                    value={supabaseForm.url}
+                    onChange={e => setSupabaseForm({ ...supabaseForm, url: e.target.value })}
+                    required
+                  />
+                  <span className="field-hint">Found in your Supabase Dashboard: Project Settings &rarr; API &rarr; Project URL.</span>
+                </div>
+
+                <div className="form-group">
+                  <label>Supabase Anon (Public) Key *</label>
+                  <input
+                    type="password"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    value={supabaseForm.key}
+                    onChange={e => setSupabaseForm({ ...supabaseForm, key: e.target.value })}
+                    required
+                  />
+                  <span className="field-hint">Found in Supabase: Project Settings &rarr; API &rarr; Project API keys &rarr; anon public.</span>
+                </div>
+
+                <div className="smtp-guide-card">
+                  <h4>💡 Quick Supabase Cloud Setup (1 Minute):</h4>
+                  <ol>
+                    <li>Create a free account or project at <a href="https://supabase.com" target="_blank" rel="noreferrer">supabase.com</a>.</li>
+                    <li>Open <strong>SQL Editor</strong> in your Supabase dashboard.</li>
+                    <li>Copy and run the provided <code>supabase_schema.sql</code> file included in this repository.</li>
+                    <li>Go to <strong>Project Settings &rarr; API</strong>, copy your <strong>URL</strong> and <strong>Anon Key</strong>, and paste them above!</li>
+                  </ol>
+                </div>
+
+                <button type="submit" className="btn btn-primary" disabled={supabaseLoading}>
+                  {supabaseLoading ? 'Connecting to Supabase...' : 'Save & Connect Supabase Storage'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* 4. Notifications Tab */}
           {activeTab === 'notifications' && (
             <div className="settings-section">
               <div className="settings-section-header">

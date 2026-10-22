@@ -3,6 +3,15 @@ import {
   initialUsers, initialProjects, initialTasks,
   initialNotifications, initialReminders, initialTodos
 } from '../data/mockData';
+import {
+  isSupabaseConfigured,
+  fetchSupabaseWorkspace,
+  syncUserProfile,
+  saveSupabaseTask,
+  deleteSupabaseTask,
+  saveSupabaseProject,
+  deleteSupabaseProject
+} from '../lib/supabaseClient';
 
 const AppContext = createContext();
 
@@ -70,6 +79,15 @@ const initialState = {
 
 function appReducer(state, action) {
   switch (action.type) {
+    case 'MERGE_SUPABASE_DATA': {
+      const { tasks, projects, users } = action.payload;
+      return {
+        ...state,
+        tasks: tasks && tasks.length ? tasks : state.tasks,
+        projects: projects && projects.length ? projects : state.projects,
+        users: users && users.length ? users : state.users
+      };
+    }
     case 'LOGIN':
       return { ...state, isAuthenticated: true, currentUser: action.payload };
     case 'LOGOUT':
@@ -389,7 +407,26 @@ export function AppProvider({ children }) {
     localStorage.setItem('trackify_settings', JSON.stringify(state.settings));
   }, [state]);
 
-  const toastTimeoutsRef = useRef({});
+  // Sync with Supabase on initial load if configured
+  useEffect(() => {
+    if (isSupabaseConfigured()) {
+      fetchSupabaseWorkspace().then(cloudData => {
+        if (cloudData && (cloudData.tasks?.length || cloudData.projects?.length)) {
+          dispatch({ type: 'MERGE_SUPABASE_DATA', payload: cloudData });
+        }
+      });
+      if (state.currentUser) {
+        syncUserProfile(state.currentUser);
+      }
+    }
+  }, []);
+
+  // Background auto-sync of user profile to Supabase on change
+  useEffect(() => {
+    if (isSupabaseConfigured() && state.currentUser) {
+      syncUserProfile(state.currentUser);
+    }
+  }, [state.currentUser]);
 
   const triggerToast = (title, message = '', type = 'info', customId = null, extraData = {}) => {
     const id = customId || `t_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -411,7 +448,7 @@ export function AppProvider({ children }) {
 
 
   return (
-    <AppContext.Provider value={{ state, dispatch, triggerToast }}>
+    <AppContext.Provider value={{ state, dispatch, triggerToast, supabaseConfigured: isSupabaseConfigured() }}>
       {children}
     </AppContext.Provider>
   );

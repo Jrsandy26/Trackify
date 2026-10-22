@@ -11060,4 +11060,658 @@ body {
   cursor: pointer;
 }
 
+/* ==========================================================================
+   MODERN ANALYTICS PAGE REDESIGN (Matches Reference Design)
+   ========================================================================== */
+
+.modern-analytics-page {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding-bottom: 40px;
+  box-sizing: border-box;
+}
+
+/* 1. Header Bar */
+.modern-analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.modern-analytics-header .header-left h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.02em;
+}
+
+.modern-analytics-header .header-left p {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.modern-analytics-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Scope Filter Pill (All Projects vs My Projects) */
+.analytics-scope-toggle {
+  display: flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.analytics-scope-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-scope-btn.active {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.35);
+}
+
+.analytics-date-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+}
+
+.analytics-date-pill:hover {
+  border-color: #cbd5e1;
+  background: var(--bg);
+}
+
+.analytics-export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 24px;
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+  transition: all 0.15s ease;
+}
+
+.analytics-export-btn:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+/* My Projects Active Banner */
+.myprojects-active-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.05) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.82rem;
+  color: #1d4ed8;
+  gap: 12px;
+}
+
+.myprojects-active-banner span strong {
+  color: #1e40af;
+}
+
+.btn-reset-scope {
+  background: transparent;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #2563eb;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.btn-reset-scope:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* 2. Top Metric Cards (Row 1) */
+.analytics-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+@media (max-width: 1100px) {
+  .analytics-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .analytics-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.analytics-metric-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.analytics-metric-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.metric-box-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.metric-circle-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-circle-badge.green {
+  background: #22c55e;
+  color: #ffffff;
+}
+
+.metric-circle-badge.purple {
+  background: #8b5cf6;
+  color: #ffffff;
+}
+
+.metric-circle-badge.orange {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.metric-circle-badge.blue {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.metric-box-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.metric-box-middle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.metric-huge-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.metric-sparkline-wrap {
+  width: 90px;
+  height: 38px;
+}
+
+.metric-box-trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.trend-badge {
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.trend-badge.green {
+  color: #16a34a;
+}
+
+/* 3. Common Analytics Card */
+.analytics-widget-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.analytics-widget-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-filter-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* 4. Row 2 & Row 3 Grid Layouts */
+.analytics-two-col-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr;
+  gap: 18px;
+}
+
+@media (max-width: 1024px) {
+  .analytics-two-col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Task Completion Trends Line Chart */
+.trends-chart-container {
+  width: 100%;
+  height: 250px;
+  position: relative;
+}
+
+.trends-chart-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.legend-item .legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Time by Project Donut Chart & List */
+.time-by-project-body {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .time-by-project-body {
+    flex-direction: column;
+  }
+}
+
+.donut-visual-col {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-center-badge {
+  position: absolute;
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut-center-badge .donut-huge-hours {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.donut-center-badge .donut-subtext {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.donut-projects-table {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.04));
+  font-size: 0.82rem;
+}
+
+.project-time-row:last-child {
+  border-bottom: none;
+}
+
+.project-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.project-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.project-hours-cell {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.project-pct-cell {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* 5. Team Productivity Table */
+.team-productivity-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.team-productivity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.team-productivity-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-productivity-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-light, rgba(0,0,0,0.04));
+  vertical-align: middle;
+}
+
+.team-productivity-table tr:last-child td {
+  border-bottom: none;
+}
+
+.col-rank {
+  color: var(--text-muted);
+  font-weight: 600;
+  width: 24px;
+}
+
+.member-cell-flex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.member-name-text {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.member-role-text {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.tasks-count-cell {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ontime-pct-pill {
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.productivity-bar-track {
+  width: 120px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.productivity-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+/* 6. Key Insights Tinted Cards */
+.key-insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.insight-tint-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.insight-tint-card:hover {
+  transform: translateX(3px);
+}
+
+.insight-tint-card.green {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.insight-tint-card.purple {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.insight-tint-card.orange {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.insight-tint-card.red {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.insight-icon-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insight-tint-card.green .insight-icon-bubble {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+}
+
+.insight-tint-card.purple .insight-icon-bubble {
+  background: rgba(139, 92, 246, 0.18);
+  color: #8b5cf6;
+}
+
+.insight-tint-card.orange .insight-icon-bubble {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+}
+
+.insight-tint-card.red .insight-icon-bubble {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+}
+
+.insight-content-block {
+  flex: 1;
+}
+
+.insight-content-block h4 {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 2px 0;
+}
+
+.insight-content-block p {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.view-report-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #3b82f6;
+  text-decoration: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.view-report-link:hover {
+  text-decoration: underline;
+}
+
+
 
