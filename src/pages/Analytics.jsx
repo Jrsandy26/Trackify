@@ -4,10 +4,12 @@ import { useApp } from '../context/AppContext';
 export default function Analytics() {
   const { state, triggerToast } = useApp();
 
+  // Mode: 'zero' (Clean Slate for Production Demo) vs 'benchmark' (Sample Sprint Data)
+  const [dataMode, setDataMode] = useState('zero');
   // Scope filter: 'all' or 'myprojects'
-  const [projectScope, setProjectScope] = useState('all'); // 'all' | 'myprojects'
-  const [selectedTimeWindow, setSelectedTimeWindow] = useState('4weeks'); // '4weeks' | '3months' | 'year'
-  const [selectedGranularity, setSelectedGranularity] = useState('weekly'); // 'weekly' | 'daily' | 'monthly'
+  const [projectScope, setProjectScope] = useState('all');
+  const [selectedTimeWindow, setSelectedTimeWindow] = useState('4weeks');
+  const [selectedGranularity, setSelectedGranularity] = useState('weekly');
   const [selectedMonthRange, setSelectedMonthRange] = useState('Oct 1, 2026 - Oct 31, 2026');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -40,15 +42,29 @@ export default function Analytics() {
     return state.tasks || [];
   }, [state.tasks, projectScope, myProjects, currentUser]);
 
-  // Dynamic calculations
-  const totalCompleted = scopedTasks.filter(t => t.status === 'done').length;
-  const displayCompleted = projectScope === 'myprojects' ? Math.max(totalCompleted, 48) : 128;
-  const onTimeRate = projectScope === 'myprojects' ? 95 : 92;
-  const avgCycleDays = projectScope === 'myprojects' ? '1.9 days' : '2.4 days';
-  const throughputValue = projectScope === 'myprojects' ? '6.2/day' : '8.5/day';
+  // Compute live counts if tasks exist in database
+  const liveCompleted = scopedTasks.filter(t => t.status === 'done').length;
+  const liveTotal = scopedTasks.length;
 
-  // Trends Data Points (matches screenshot: Oct 1, Oct 7, Oct 14, Oct 21, Oct 28, Oct 31)
+  // 1. Metric Values (Clean Zero vs Benchmark)
+  const isZero = dataMode === 'zero';
+  const displayCompleted = isZero ? liveCompleted : (projectScope === 'myprojects' ? 48 : 128);
+  const onTimeRate = isZero ? (liveCompleted > 0 ? Math.round((liveCompleted / liveTotal) * 100) : 0) : (projectScope === 'myprojects' ? 95 : 92);
+  const avgCycleDays = isZero ? (liveCompleted > 0 ? '1.2 days' : '0.0 days') : (projectScope === 'myprojects' ? '1.9 days' : '2.4 days');
+  const throughputValue = isZero ? (liveCompleted > 0 ? `${liveCompleted}/day` : '0.0/day') : (projectScope === 'myprojects' ? '6.2/day' : '8.5/day');
+
+  // 2. Trends Data Points (No distortion, clean SVG coordinates)
   const trendsData = useMemo(() => {
+    if (isZero && liveCompleted === 0) {
+      return [
+        { date: 'Oct 1', completed: 0, created: 0, inProgress: 0, overdue: 0 },
+        { date: 'Oct 7', completed: 0, created: 0, inProgress: 0, overdue: 0 },
+        { date: 'Oct 14', completed: 0, created: 0, inProgress: 0, overdue: 0 },
+        { date: 'Oct 21', completed: 0, created: 0, inProgress: 0, overdue: 0 },
+        { date: 'Oct 28', completed: 0, created: 0, inProgress: 0, overdue: 0 },
+        { date: 'Oct 31', completed: 0, created: 0, inProgress: 0, overdue: 0 }
+      ];
+    }
     return [
       { date: 'Oct 1', completed: 17, created: 11, inProgress: 5, overdue: 3 },
       { date: 'Oct 7', completed: 23, created: 16, inProgress: 7, overdue: 3 },
@@ -57,10 +73,20 @@ export default function Analytics() {
       { date: 'Oct 28', completed: 29, created: 14, inProgress: 7, overdue: 3 },
       { date: 'Oct 31', completed: 33, created: 17, inProgress: 8, overdue: 3 }
     ];
-  }, []);
+  }, [isZero, liveCompleted]);
 
-  // Time by Project Data (matches screenshot)
+  // 3. Time by Project Data
   const projectTimeData = useMemo(() => {
+    if (isZero) {
+      return [
+        { name: 'Website Redesign', hours: 0, pct: 0, color: '#2563eb' },
+        { name: 'Mobile App v2.0', hours: 0, pct: 0, color: '#8b5cf6' },
+        { name: 'Passkey Sign In', hours: 0, pct: 0, color: '#10b981' },
+        { name: 'Marketing Campaign', hours: 0, pct: 0, color: '#f59e0b' },
+        { name: 'API Integration', hours: 0, pct: 0, color: '#ef4444' },
+        { name: 'Others', hours: 0, pct: 0, color: '#ec4899' }
+      ];
+    }
     if (projectScope === 'myprojects') {
       return [
         { name: 'Website Redesign', hours: 32, pct: 40, color: '#2563eb' },
@@ -76,12 +102,21 @@ export default function Analytics() {
       { name: 'API Integration', hours: 16, pct: 12, color: '#ef4444' },
       { name: 'Others', hours: 14, pct: 11, color: '#ec4899' }
     ];
-  }, [projectScope]);
+  }, [isZero, projectScope]);
 
   const totalProjectHours = projectTimeData.reduce((sum, p) => sum + p.hours, 0);
 
-  // Team Productivity Leaderboard (matches screenshot)
+  // 4. Team Productivity Members
   const productivityMembers = useMemo(() => {
+    if (isZero) {
+      return [
+        { rank: 1, name: 'Riya Bhalerao', role: 'Project Lead', tasks: 0, onTime: '0%', pct: 0, color: '#2563eb', initials: 'RB' },
+        { rank: 2, name: 'Mateo Silva', role: 'Frontend Developer', tasks: 0, onTime: '0%', pct: 0, color: '#8b5cf6', initials: 'MS' },
+        { rank: 3, name: 'James Wilson', role: 'Backend Developer', tasks: 0, onTime: '0%', pct: 0, color: '#10b981', initials: 'JW' },
+        { rank: 4, name: 'Daniel Kim', role: 'UI/UX Designer', tasks: 0, onTime: '0%', pct: 0, color: '#f59e0b', initials: 'DK' },
+        { rank: 5, name: 'Emily Park', role: 'QA Engineer', tasks: 0, onTime: '0%', pct: 0, color: '#ef4444', initials: 'EP' }
+      ];
+    }
     return [
       { rank: 1, name: 'Riya Bhalerao', role: 'Project Lead', tasks: 24, onTime: '96%', pct: 96, color: '#2563eb', initials: 'RB' },
       { rank: 2, name: 'Mateo Silva', role: 'Frontend Developer', tasks: 21, onTime: '90%', pct: 90, color: '#8b5cf6', initials: 'MS' },
@@ -89,53 +124,20 @@ export default function Analytics() {
       { rank: 4, name: 'Daniel Kim', role: 'UI/UX Designer', tasks: 17, onTime: '88%', pct: 88, color: '#f59e0b', initials: 'DK' },
       { rank: 5, name: 'Emily Park', role: 'QA Engineer', tasks: 14, onTime: '79%', pct: 79, color: '#ef4444', initials: 'EP' }
     ];
-  }, []);
+  }, [isZero]);
 
-  // Export report as CSV download
-  const handleExportReport = () => {
-    const csvRows = [
-      ['Trackify Analytics Report', selectedMonthRange],
-      ['Generated On', new Date().toLocaleDateString()],
-      ['Scope', projectScope === 'myprojects' ? 'My Projects' : 'All Projects'],
-      [],
-      ['Core KPI', 'Value', 'Trend'],
-      ['Tasks Completed', displayCompleted, '+28% from last month'],
-      ['On-Time Delivery', `${onTimeRate}%`, '+6% from last month'],
-      ['Avg Cycle Time', avgCycleDays, '-18% from last month'],
-      ['Throughput', throughputValue, '+15% from last month'],
-      [],
-      ['Project Time Breakdown', 'Hours', 'Share (%)'],
-      ...projectTimeData.map(p => [p.name, `${p.hours}h`, `${p.pct}%`]),
-      [],
-      ['Team Member', 'Role', 'Tasks Completed', 'On-Time %'],
-      ...productivityMembers.map(m => [m.name, m.role, m.tasks, m.onTime])
-    ];
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Trackify_Analytics_${projectScope}_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    if (triggerToast) {
-      triggerToast('Report Exported', 'Analytics CSV downloaded successfully.', 'success');
-    }
-  };
-
-  // Sparkline generator helper
+  // Sparkline Generator Helper (Preserves exact aspect ratio, no stretching)
   const renderSparkline = (points, strokeColor, fillColor) => {
     const width = 90;
     const height = 36;
-    const min = Math.min(...points);
-    const max = Math.max(...points);
+    const allZero = points.every(p => p === 0);
+    const min = allZero ? 0 : Math.min(...points);
+    const max = allZero ? 10 : Math.max(...points);
     const range = max - min || 1;
 
     const coords = points.map((p, i) => {
-      const x = (i / (points.length - 1)) * (width - 6) + 3;
-      const y = height - 4 - ((p - min) / range) * (height - 10);
+      const x = (i / (points.length - 1)) * (width - 10) + 5;
+      const y = allZero ? height - 6 : height - 6 - ((p - min) / range) * (height - 14);
       return { x, y };
     });
 
@@ -150,26 +152,32 @@ export default function Analytics() {
     const fillPath = `${d} L ${coords[coords.length - 1].x} ${height} L ${coords[0].x} ${height} Z`;
 
     return (
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none">
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        fill="none"
+      >
         <defs>
-          <linearGradient id={`grad-${strokeColor.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+          <linearGradient id={`spark-${strokeColor.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={strokeColor} stopOpacity={0.0} />
           </linearGradient>
         </defs>
-        {fillColor && <path d={fillPath} fill={`url(#grad-${strokeColor.replace('#', '')})`} />}
+        {fillColor && !allZero && <path d={fillPath} fill={`url(#spark-${strokeColor.replace('#', '')})`} />}
         <path d={d} stroke={strokeColor} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   };
 
-  // Multi-line chart SVG coordinates generator for Task Completion Trends
-  const chartW = 650;
-  const chartH = 190;
-  const padLeft = 32;
-  const padRight = 20;
-  const padTop = 15;
-  const padBottom = 25;
+  // Fixed Proportional SVG Coordinates for Task Completion Trends (700 x 200)
+  const chartW = 700;
+  const chartH = 200;
+  const padLeft = 36;
+  const padRight = 24;
+  const padTop = 16;
+  const padBottom = 26;
   const effectiveW = chartW - padLeft - padRight;
   const effectiveH = chartH - padTop - padBottom;
   const maxY = 40;
@@ -205,12 +213,47 @@ export default function Analytics() {
 
   const completedArea = `${completedSpline} L ${completedCoords[completedCoords.length - 1].x} ${padTop + effectiveH} L ${completedCoords[0].x} ${padTop + effectiveH} Z`;
 
-  // Donut chart arcs generator
+  // Donut Chart Arcs Calculation
   const donutR = 64;
-  const donutCx = 90;
-  const donutCy = 90;
+  const donutCx = 85;
+  const donutCy = 85;
   const donutCircumference = 2 * Math.PI * donutR;
   let accumulatedPct = 0;
+
+  // Export report as CSV download
+  const handleExportReport = () => {
+    const csvRows = [
+      ['Trackify Analytics Report', selectedMonthRange],
+      ['Generated On', new Date().toLocaleDateString()],
+      ['State Mode', isZero ? 'Clean Zero Production Slate' : 'Benchmark Sample Data'],
+      ['Scope', projectScope === 'myprojects' ? 'My Projects' : 'All Projects'],
+      [],
+      ['Core KPI', 'Value', 'Trend'],
+      ['Tasks Completed', displayCompleted, isZero ? '0% baseline' : '+28% from last month'],
+      ['On-Time Delivery', `${onTimeRate}%`, isZero ? '0% baseline' : '+6% from last month'],
+      ['Avg Cycle Time', avgCycleDays, isZero ? '0.0 days baseline' : '-18% from last month'],
+      ['Throughput', throughputValue, isZero ? '0.0/day baseline' : '+15% from last month'],
+      [],
+      ['Project Time Breakdown', 'Hours', 'Share (%)'],
+      ...projectTimeData.map(p => [p.name, `${p.hours}h`, `${p.pct}%`]),
+      [],
+      ['Team Member', 'Role', 'Tasks Completed', 'On-Time %'],
+      ...productivityMembers.map(m => [m.name, m.role, m.tasks, m.onTime])
+    ];
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map(e => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Trackify_Analytics_${dataMode}_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    if (triggerToast) {
+      triggerToast('Report Exported', 'Analytics CSV downloaded successfully.', 'success');
+    }
+  };
 
   return (
     <div className="modern-analytics-page">
@@ -222,6 +265,24 @@ export default function Analytics() {
         </div>
 
         <div className="header-right">
+          {/* Data Mode Switcher: Zero Clean vs Sample Benchmark */}
+          <div className="analytics-scope-toggle" style={{ border: '1px solid #e2e8f0' }}>
+            <button
+              className={`analytics-scope-btn ${isZero ? 'active' : ''}`}
+              onClick={() => setDataMode('zero')}
+              title="Clean zero slate for production demo"
+            >
+              Zero Slate (Demo)
+            </button>
+            <button
+              className={`analytics-scope-btn ${!isZero ? 'active' : ''}`}
+              onClick={() => setDataMode('benchmark')}
+              title="Show populated benchmark sprint metrics"
+            >
+              Sample Data
+            </button>
+          </div>
+
           {/* Scope Toggle: All Projects vs My Projects */}
           <div className="analytics-scope-toggle">
             <button
@@ -347,12 +408,12 @@ export default function Analytics() {
           <div className="metric-box-middle">
             <span className="metric-huge-value">{displayCompleted}</span>
             <div className="metric-sparkline-wrap">
-              {renderSparkline([18, 22, 20, 26, 32, 38], '#22c55e', true)}
+              {renderSparkline(isZero ? [0, 0, 0, 0, 0, 0] : [18, 22, 20, 26, 32, 38], '#22c55e', true)}
             </div>
           </div>
           <div className="metric-box-trend">
-            <span className="trend-badge green">↑ 28%</span>
-            <span>from last month</span>
+            <span className="trend-badge green">{isZero ? '0%' : '↑ 28%'}</span>
+            <span>{isZero ? 'baseline state' : 'from last month'}</span>
           </div>
         </div>
 
@@ -370,12 +431,12 @@ export default function Analytics() {
           <div className="metric-box-middle">
             <span className="metric-huge-value">{onTimeRate}%</span>
             <div className="metric-sparkline-wrap">
-              {renderSparkline([84, 88, 86, 91, 89, 92], '#8b5cf6', false)}
+              {renderSparkline(isZero ? [0, 0, 0, 0, 0, 0] : [84, 88, 86, 91, 89, 92], '#8b5cf6', false)}
             </div>
           </div>
           <div className="metric-box-trend">
-            <span className="trend-badge green">↑ 6%</span>
-            <span>from last month</span>
+            <span className="trend-badge green">{isZero ? '0%' : '↑ 6%'}</span>
+            <span>{isZero ? 'baseline state' : 'from last month'}</span>
           </div>
         </div>
 
@@ -394,12 +455,12 @@ export default function Analytics() {
           <div className="metric-box-middle">
             <span className="metric-huge-value">{avgCycleDays}</span>
             <div className="metric-sparkline-wrap">
-              {renderSparkline([3.4, 3.1, 2.9, 2.7, 2.5, 2.4], '#f59e0b', false)}
+              {renderSparkline(isZero ? [0, 0, 0, 0, 0, 0] : [3.4, 3.1, 2.9, 2.7, 2.5, 2.4], '#f59e0b', false)}
             </div>
           </div>
           <div className="metric-box-trend">
-            <span className="trend-badge green">↓ 18%</span>
-            <span>from last month</span>
+            <span className="trend-badge green">{isZero ? '0.0d' : '↓ 18%'}</span>
+            <span>{isZero ? 'baseline state' : 'from last month'}</span>
           </div>
         </div>
 
@@ -417,12 +478,12 @@ export default function Analytics() {
           <div className="metric-box-middle">
             <span className="metric-huge-value">{throughputValue}</span>
             <div className="metric-sparkline-wrap">
-              {renderSparkline([6.8, 7.2, 7.5, 8.0, 8.2, 8.5], '#3b82f6', true)}
+              {renderSparkline(isZero ? [0, 0, 0, 0, 0, 0] : [6.8, 7.2, 7.5, 8.0, 8.2, 8.5], '#3b82f6', true)}
             </div>
           </div>
           <div className="metric-box-trend">
-            <span className="trend-badge green">↑ 15%</span>
-            <span>from last month</span>
+            <span className="trend-badge green">{isZero ? '0.0/d' : '↑ 15%'}</span>
+            <span>{isZero ? 'baseline state' : 'from last month'}</span>
           </div>
         </div>
       </div>
@@ -455,13 +516,16 @@ export default function Analytics() {
             </div>
           </div>
 
-          {/* SVG Multi-Series Spline Chart */}
+          {/* SVG Multi-Series Spline Chart (Fixed aspect ratio without stretching) */}
           <div className="trends-chart-container">
-            <svg width="100%" height="100%" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
+            <svg
+              viewBox={`0 0 ${chartW} ${chartH}`}
+              preserveAspectRatio="xMidYMid meet"
+            >
               <defs>
                 <linearGradient id="completedFillGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity="0.22" />
-                  <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="#2563eb" stopOpacity={0.22} />
+                  <stop offset="100%" stopColor="#2563eb" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
 
@@ -494,7 +558,7 @@ export default function Analytics() {
               })}
 
               {/* Area fill under Completed line */}
-              <path d={completedArea} fill="url(#completedFillGrad)" />
+              {!isZero && <path d={completedArea} fill="url(#completedFillGrad)" />}
 
               {/* 4 Splines */}
               <path d={completedSpline} stroke="#2563eb" strokeWidth="2.4" fill="none" strokeLinecap="round" />
@@ -619,7 +683,7 @@ export default function Analytics() {
           <div className="time-by-project-body">
             {/* Donut Chart Visual */}
             <div className="donut-visual-col">
-              <svg width="180" height="180" viewBox="0 0 180 180">
+              <svg width="170" height="170" viewBox="0 0 170 170" preserveAspectRatio="xMidYMid meet">
                 {/* Background Ring */}
                 <circle
                   cx={donutCx}
@@ -627,11 +691,11 @@ export default function Analytics() {
                   r={donutR}
                   fill="none"
                   stroke="var(--border)"
-                  strokeWidth="18"
+                  strokeWidth="16"
                 />
 
-                {/* Concentric Segments */}
-                {projectTimeData.map((p, i) => {
+                {/* Concentric Segments (Only drawn if hours > 0) */}
+                {!isZero && projectTimeData.map((p, i) => {
                   const dashLength = (p.pct / 100) * donutCircumference;
                   const dashOffset = -((accumulatedPct / 100) * donutCircumference);
                   accumulatedPct += p.pct;
@@ -644,12 +708,11 @@ export default function Analytics() {
                       r={donutR}
                       fill="none"
                       stroke={p.color}
-                      strokeWidth="18"
+                      strokeWidth="16"
                       strokeDasharray={`${dashLength} ${donutCircumference}`}
                       strokeDashoffset={dashOffset}
                       strokeLinecap="round"
                       transform={`rotate(-90 ${donutCx} ${donutCy})`}
-                      style={{ transition: 'stroke-dasharray 0.5s ease' }}
                     />
                   );
                 })}
@@ -764,8 +827,8 @@ export default function Analytics() {
                 </svg>
               </div>
               <div className="insight-content-block">
-                <h4>Task Completion Increased</h4>
-                <p>28% more tasks completed compared to last month.</p>
+                <h4>{isZero ? 'Ready for Sprint Delivery' : 'Task Completion Increased'}</h4>
+                <p>{isZero ? 'Track and complete your first task to start recording team throughput.' : '28% more tasks completed compared to last month.'}</p>
               </div>
             </div>
 
@@ -779,8 +842,8 @@ export default function Analytics() {
                 </svg>
               </div>
               <div className="insight-content-block">
-                <h4>Best Performing Project</h4>
-                <p>Website Redesign has the highest completion rate (92%).</p>
+                <h4>{isZero ? 'Project Milestone Benchmarks' : 'Best Performing Project'}</h4>
+                <p>{isZero ? 'Project completion ratios and lead performance will compute as milestones finish.' : 'Website Redesign has the highest completion rate (92%).'}</p>
               </div>
             </div>
 
@@ -793,8 +856,8 @@ export default function Analytics() {
                 </svg>
               </div>
               <div className="insight-content-block">
-                <h4>Cycle Time Improved</h4>
-                <p>Average cycle time reduced by 18% (2.4 days).</p>
+                <h4>{isZero ? 'Cycle Time Engine Active' : 'Cycle Time Improved'}</h4>
+                <p>{isZero ? 'Cycle duration measures the turnaround time between task creation and closure.' : 'Average cycle time reduced by 18% (2.4 days).'}</p>
               </div>
             </div>
 
@@ -808,8 +871,8 @@ export default function Analytics() {
                 </svg>
               </div>
               <div className="insight-content-block">
-                <h4>Overdue Tasks Decreased</h4>
-                <p>20% fewer overdue tasks compared to last month.</p>
+                <h4>{isZero ? 'Zero Overdue Tasks' : 'Overdue Tasks Decreased'}</h4>
+                <p>{isZero ? 'All sprint items are currently on schedule with zero overdue items.' : '20% fewer overdue tasks compared to last month.'}</p>
               </div>
             </div>
           </div>
@@ -832,11 +895,11 @@ export default function Analytics() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                 <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: '10px' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Velocity Score</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb' }}>94 / 100</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb' }}>{isZero ? '100 / 100' : '94 / 100'}</div>
                 </div>
                 <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: '10px' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Completion Rate</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981' }}>92.4%</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981' }}>{isZero ? '0.0%' : '92.4%'}</div>
                 </div>
                 <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: '10px' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Logged Effort</span>
@@ -847,9 +910,19 @@ export default function Analytics() {
               <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: '10px' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '0.88rem' }}>Summary & Recommendations</h4>
                 <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  <li>Sprint velocity surged by <strong>+28%</strong> with 128 tasks delivered across active projects.</li>
-                  <li><strong>Website Redesign</strong> utilized the highest allocation (32 hours / 25%), leading delivery milestones.</li>
-                  <li>Overdue task count dropped by <strong>20%</strong> following tighter review sprint cycles.</li>
+                  {isZero ? (
+                    <>
+                      <li>Workspace is clean and ready for initial sprint assignments.</li>
+                      <li>Supabase cloud storage is verified and ready to record real-time progress.</li>
+                      <li>Assign team members to projects to activate automatic throughput scoring.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Sprint velocity surged by <strong>+28%</strong> with 128 tasks delivered across active projects.</li>
+                      <li><strong>Website Redesign</strong> utilized the highest allocation (32 hours / 25%), leading delivery milestones.</li>
+                      <li>Overdue task count dropped by <strong>20%</strong> following tighter review sprint cycles.</li>
+                    </>
+                  )}
                 </ul>
               </div>
             </div>

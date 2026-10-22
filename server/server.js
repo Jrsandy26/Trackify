@@ -23,36 +23,7 @@ app.use(express.json());
 
 // In-memory state stores for OTPs and invitations
 const otpStore = new Map();
-let invitations = [
-  {
-    id: 'inv-1',
-    token: 'tok_alex_2026',
-    inviterName: 'Sandeep Sai',
-    inviterEmail: 'sandeep@trackify.com',
-    recipientName: 'Alex Mercer',
-    recipientEmail: 'alex.mercer@gmail.com',
-    role: 'Project Manager',
-    department: 'Product',
-    project: 'Website Redesign',
-    note: 'Welcome to the Trackify redesign sprint!',
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'inv-2',
-    token: 'tok_clara_2026',
-    inviterName: 'Sandeep Sai',
-    inviterEmail: 'sandeep@trackify.com',
-    recipientName: 'Clara Vance',
-    recipientEmail: 'clara.vance@outlook.com',
-    role: 'Senior Developer',
-    department: 'Engineering',
-    project: 'Passkey Sign In',
-    note: 'Looking forward to building Passkey authentication together.',
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  }
-];
+let invitations = [];
 
 // Helper to configure Gmail SMTP Transporter
 function getTransporter() {
