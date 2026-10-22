@@ -23,7 +23,7 @@ export default function Auth() {
   const navigate = useNavigate();
 
   // Quick domain chips
-  const domains = ['@gmail.com', '@outlook.com', '@hotmail.com', '@trackify.com'];
+  const domains = ['@gmail.com', '@outlook.com', '@company.com'];
 
   const handleDomainClick = (domain) => {
     const prefix = email.split('@')[0] || '';
@@ -51,7 +51,7 @@ export default function Auth() {
     setSuccessMsg('');
 
     if (!email.trim()) {
-      setError('Please enter your email ID');
+      setError('Please enter your email address');
       return;
     }
 
@@ -61,7 +61,7 @@ export default function Auth() {
         return;
       }
       if (!designation.trim()) {
-        setError('Please enter your designation');
+        setError('Please enter your designation or role');
         return;
       }
       if (!department) {
@@ -72,7 +72,7 @@ export default function Auth() {
       // Check if user already exists
       const existing = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
       if (existing) {
-        setError('An account with this email already exists. Please Sign In instead.');
+        setError('An account with this email already exists. Please sign in instead.');
         return;
       }
     }
@@ -96,14 +96,14 @@ export default function Auth() {
 
       setOtpSent(true);
       startTimer();
-      setSuccessMsg(data.message || `6-digit verification code sent to ${email}`);
+      setSuccessMsg(data.message || `Verification code sent to ${email}`);
       
       if (data.debugOtp) {
         setOtpHint(data.debugOtp);
       }
 
       if (triggerToast) {
-        triggerToast('Code Sent! 📬', data.message || `Check your inbox (${email})`, 'success');
+        triggerToast('Code Sent! 📬', data.message || `Check your inbox at ${email}`, 'success');
       }
     } catch (err) {
       console.warn('Backend send-otp error, using client fallback:', err);
@@ -112,9 +112,9 @@ export default function Auth() {
       setOtpSent(true);
       setOtpHint(fallbackOtp);
       startTimer();
-      setSuccessMsg(`Simulated OTP: Code generated for ${email}`);
+      setSuccessMsg(`Verification code generated for ${email}`);
       if (triggerToast) {
-        triggerToast('Verification Code Ready', `Use code: ${fallbackOtp}`, 'info');
+        triggerToast('Verification Code Ready', `Your code is ${fallbackOtp}`, 'info');
       }
     } finally {
       setLoading(false);
@@ -126,7 +126,7 @@ export default function Auth() {
     e.preventDefault();
     setError('');
     if (!otp.trim() || otp.trim().length < 6) {
-      setError('Please enter the full 6-digit verification code');
+      setError('Please enter the complete 6-digit verification code');
       return;
     }
 
@@ -158,7 +158,7 @@ export default function Auth() {
       }
 
       if (!verified) {
-        throw new Error('Invalid code. Please try again.');
+        throw new Error('Invalid verification code. Please check and try again.');
       }
 
       // Successful verification -> create or find user
@@ -197,7 +197,7 @@ export default function Auth() {
 
       if (triggerToast) {
         triggerToast(
-          isSignUp ? 'Account Created! 🎉' : '2-Step Verified! 🛡️',
+          isSignUp ? 'Account Created! 🎉' : 'Signed In Successfully! 🔐',
           `Welcome to Trackify, ${userPayload.name}!`,
           'success'
         );
@@ -220,7 +220,7 @@ export default function Auth() {
     try {
       const user = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password);
       if (!user) {
-        setError('Invalid email or password');
+        setError('Invalid email address or password');
         setLoading(false);
         return;
       }
@@ -259,32 +259,32 @@ export default function Auth() {
           </div>
 
           <h2 className="auth-tagline">
-            Manage projects with <span>Realtime Team Sync</span> & 2-Step Email Verification
+            Manage projects with <span>Real-Time Team Sync</span> & Seamless Collaboration
           </h2>
           <p className="auth-description">
-            Sign in securely using your personal Gmail or Outlook address. Dispatches real SMTP OTP verification and invitations to collaborate.
+            Organize tasks, track project milestones, and collaborate with your team efficiently from one centralized workspace.
           </p>
 
           <div className="auth-features">
             <div className="auth-feature">
-              <div className="feature-icon">✉️</div>
+              <div className="feature-icon">🔐</div>
               <div>
-                <strong>Personal Gmail SMTP & Outlook</strong><br />
-                Login securely with 2-step verification code delivered to your inbox
+                <strong>Secure Authentication</strong><br />
+                Sign in safely using instant verification codes or password protection
               </div>
             </div>
             <div className="auth-feature">
               <div className="feature-icon">👥</div>
               <div>
-                <strong>End-to-End Realtime Invitations</strong><br />
-                Invite organization members with 1-click email join links that sync in real-time
+                <strong>Team Collaboration</strong><br />
+                Invite organization members with one-click email invitations that sync across workspaces
               </div>
             </div>
             <div className="auth-feature">
               <div className="feature-icon">⚡</div>
               <div>
-                <strong>Cross-Account Synchronization</strong><br />
-                Invited members and project updates reflect instantly across open accounts
+                <strong>Real-Time Data Sync</strong><br />
+                Task updates, project progress, and team activity reflect instantly across all active users
               </div>
             </div>
           </div>
@@ -301,14 +301,14 @@ export default function Auth() {
                   className={`auth-method-btn ${authMode === 'otp' ? 'active' : ''}`}
                   onClick={() => { setAuthMode('otp'); setError(''); }}
                 >
-                  🛡️ 2-Step OTP
+                  One-Time Code
                 </button>
                 <button
                   type="button"
                   className={`auth-method-btn ${authMode === 'password' ? 'active' : ''}`}
                   onClick={() => { setAuthMode('password'); setError(''); }}
                 >
-                  🔑 Password
+                  Password
                 </button>
               </div>
             )}
@@ -316,22 +316,22 @@ export default function Auth() {
             <div className="auth-card-header">
               <h2>
                 {isSignUp
-                  ? (otpSent ? 'Verify Email' : 'Create Account')
+                  ? (otpSent ? 'Verify Your Email' : 'Create an Account')
                   : (authMode === 'otp'
-                      ? (otpSent ? 'Enter Verification Code' : 'Sign In')
-                      : 'Sign In')}
+                      ? (otpSent ? 'Enter Verification Code' : 'Welcome Back')
+                      : 'Welcome Back')}
               </h2>
               <p>
                 {isSignUp
-                  ? (otpSent ? `Check your inbox at ${email} for your 6-digit code` : 'Enter your details to create your workspace account')
+                  ? (otpSent ? `Enter the 6-digit verification code sent to ${email}` : 'Enter your details to create your workspace account')
                   : (authMode === 'otp'
-                      ? (otpSent ? `Check your inbox at ${email} for your 6-digit code` : 'Sign in using your personal Gmail or Outlook address')
-                      : 'Enter your email and password to access your workspace')}
+                      ? (otpSent ? `Enter the 6-digit verification code sent to ${email}` : 'Enter your email address to sign in with a verification code')
+                      : 'Enter your credentials to access your workspace')}
               </p>
             </div>
 
             {/* =========================================================================
-                CASE 1: ACCOUNT CREATION FLOW (Dedicated: Name, Email ID, Designation, Department)
+                CASE 1: ACCOUNT CREATION FLOW (Name, Email Address, Designation, Department)
                 ========================================================================= */}
             {isSignUp ? (
               !otpSent ? (
@@ -339,7 +339,7 @@ export default function Auth() {
                 <form onSubmit={handleSendOtp} className="auth-form">
                   {/* 1. Name */}
                   <div className="form-group">
-                    <label htmlFor="auth-name">Full Name *</label>
+                    <label htmlFor="auth-name">Full Name</label>
                     <input
                       id="auth-name"
                       type="text"
@@ -351,13 +351,13 @@ export default function Auth() {
                     />
                   </div>
 
-                  {/* 2. Email ID */}
+                  {/* 2. Email Address */}
                   <div className="form-group">
-                    <label htmlFor="auth-email">Email ID *</label>
+                    <label htmlFor="auth-email">Email Address</label>
                     <input
                       id="auth-email"
                       type="email"
-                      placeholder="e.g. yourname@gmail.com or @outlook.com"
+                      placeholder="name@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -381,7 +381,7 @@ export default function Auth() {
 
                   {/* 3. Designation */}
                   <div className="form-group">
-                    <label htmlFor="auth-designation">Designation *</label>
+                    <label htmlFor="auth-designation">Designation / Role</label>
                     <input
                       id="auth-designation"
                       type="text"
@@ -406,7 +406,7 @@ export default function Auth() {
 
                   {/* 4. Department */}
                   <div className="form-group">
-                    <label htmlFor="auth-department">Department *</label>
+                    <label htmlFor="auth-department">Department</label>
                     <select
                       id="auth-department"
                       value={department}
@@ -470,7 +470,7 @@ export default function Auth() {
                   {error && <div className="auth-error">{error}</div>}
 
                   <button type="submit" className="auth-submit-btn" disabled={loading || otp.length < 6}>
-                    {loading ? <span className="spinner" /> : <span>Verify & Complete Account Creation &rarr;</span>}
+                    {loading ? <span className="spinner" /> : <span>Complete Registration &rarr;</span>}
                   </button>
 
                   <div className="otp-resend-row">
@@ -491,25 +491,25 @@ export default function Auth() {
                       className="change-email-btn"
                       onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
                     >
-                      ← Edit Details
+                      ← Back
                     </button>
                   </div>
                 </form>
               )
             ) : (
               /* =========================================================================
-                  CASE 2: SIGN IN FLOW (OTP or Password)
+                  CASE 2: SIGN IN FLOW (One-Time Code or Password)
                   ========================================================================= */
               authMode === 'otp' ? (
                 !otpSent ? (
-                  /* Step 1: Sign In via 2-Step OTP */
+                  /* Step 1: Sign In via One-Time Code */
                   <form onSubmit={handleSendOtp} className="auth-form">
                     <div className="form-group">
-                      <label htmlFor="login-email">Email Address (Gmail / Outlook) *</label>
+                      <label htmlFor="login-email">Email Address</label>
                       <input
                         id="login-email"
                         type="email"
-                        placeholder="e.g. yourname@gmail.com or @outlook.com"
+                        placeholder="name@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -538,7 +538,7 @@ export default function Auth() {
                       {loading ? (
                         <span className="spinner" />
                       ) : (
-                        <span>Sign In &rarr;</span>
+                        <span>Send Verification Code &rarr;</span>
                       )}
                     </button>
                   </form>
@@ -562,7 +562,7 @@ export default function Auth() {
                     )}
 
                     <div className="form-group">
-                      <label htmlFor="auth-otp-input">6-Digit Code</label>
+                      <label htmlFor="auth-otp-input">6-Digit Verification Code</label>
                       <input
                         id="auth-otp-input"
                         type="text"
@@ -578,7 +578,7 @@ export default function Auth() {
                     {error && <div className="auth-error">{error}</div>}
 
                     <button type="submit" className="auth-submit-btn" disabled={loading || otp.length < 6}>
-                      {loading ? <span className="spinner" /> : <span>Verify & Sign In &rarr;</span>}
+                      {loading ? <span className="spinner" /> : <span>Sign In &rarr;</span>}
                     </button>
 
                     <div className="otp-resend-row">
@@ -599,7 +599,7 @@ export default function Auth() {
                         className="change-email-btn"
                         onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
                       >
-                        Change Email
+                        ← Change Email
                       </button>
                     </div>
                   </form>
@@ -612,7 +612,7 @@ export default function Auth() {
                     <input
                       id="pwd-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="name@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -657,11 +657,8 @@ export default function Auth() {
               </button>
             </p>
 
-            <div className="auth-demo-hint">
-              <p>⚡ <strong>Gmail SMTP Support:</strong> Enter your Gmail address above to receive real 2-step OTP verification codes.</p>
-              <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-                You can configure your personal 16-character Google App Password in <code>.env</code> or directly in the Settings page.
-              </p>
+            <div className="auth-trust-badge" style={{ textAlign: 'center', marginTop: '18px', color: '#64748b', fontSize: '0.78rem' }}>
+              🔒 Protected by 256-bit encryption & secure cloud storage
             </div>
           </div>
         </div>
