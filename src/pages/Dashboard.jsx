@@ -1356,6 +1356,33 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* Active Sprint Session Context & Notes Card (Eliminates Empty Gap) */}
+          <div className="tracker-active-session-box" onClick={() => setShowNotesModal(true)} title="Click to view/edit session notes">
+            <div className="session-box-header">
+              <span className={`session-badge-pill ${timerRunning ? 'running' : 'paused'}`}>
+                <span className={`pulse-dot-${timerRunning ? 'green' : 'amber'}`} />
+                {timerRunning ? 'ACTIVE SPRINT SESSION' : 'SESSION PAUSED'}
+              </span>
+              <span className="session-edit-hint">Edit notes ✎</span>
+            </div>
+            <div className="session-notes-snippet">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              <span>{currentSessionNotes || 'Biometric WebAuthn challenge handling and token verification.'}</span>
+            </div>
+            <div className="session-progress-line-track">
+              <div className="session-progress-line-fill" style={{ width: '68%' }} />
+            </div>
+            <div className="session-meta-subrow">
+              <span>Sprint Target: 2h 00m</span>
+              <span>68% elapsed</span>
+            </div>
+          </div>
+
           {/* Clean Modern Timer Display and Controls matching Image 1 */}
           <div className="tracker-stage-horizontal-row">
             {/* Digital Clock Numbers & Live Status */}
