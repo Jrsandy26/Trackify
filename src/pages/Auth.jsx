@@ -73,19 +73,13 @@ export default function Auth() {
       return;
     }
 
-    // Check if user already exists
-    const existing = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (existing) {
-      setError('An account with this email already exists. Please sign in instead.');
-      return;
-    }
-
     setLoading(true);
     try {
+      const existing = state.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
       const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
       const colors = ['#0284c7', '#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'];
       const userPayload = {
-        id: `u${Date.now()}`,
+        id: existing?.id || `u${Date.now()}`,
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: password,
@@ -94,8 +88,8 @@ export default function Auth() {
         bio: `${designation.trim() || 'Team Member'} · ${department || 'Engineering'}`,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         avatar: null,
-        initials: initials || 'TU',
-        color: colors[Math.floor(Math.random() * colors.length)]
+        initials: initials || 'AS',
+        color: existing?.color || colors[Math.floor(Math.random() * colors.length)]
       };
 
       dispatch({ type: 'SIGNUP', payload: userPayload });
@@ -537,7 +531,7 @@ export default function Auth() {
                   <input
                     id="auth-name"
                     type="text"
-                    placeholder="e.g. Sandeep Sai"
+                    placeholder="e.g. Andrew Smith"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required

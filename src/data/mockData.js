@@ -3,15 +3,15 @@
 export const initialUsers = [
   {
     id: 'u0',
-    name: 'Sandeep Sai',
-    email: 'sandeep@trackify.com',
+    name: 'Andrew Smith',
+    email: 'andrew@trackify.com',
     avatar: null,
     role: 'Product Lead',
     department: 'Product',
     bio: 'Product Lead & Founder at Trackify.',
     timezone: 'UTC+5:30 (IST)',
     password: 'demo123',
-    initials: 'S',
+    initials: 'AS',
     color: '#4f46e5'
   },
   {
