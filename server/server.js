@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
+import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -68,8 +69,58 @@ function getTransporter() {
   });
 }
 
+// Helper to configure Supabase Server Client
+function getSupabaseServerClient() {
+  const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+  const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
 // -------------------------------------------------------------
-// 1. SMTP Health & Runtime Configuration
+// 1. Supabase Health & Runtime Configuration
+// -------------------------------------------------------------
+app.get('/api/config/supabase', async (req, res) => {
+  const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+  const hasKey = Boolean(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY);
+  const hasSecret = Boolean(process.env.SUPABASE_SECRET_KEY);
+
+  const client = getSupabaseServerClient();
+  let connected = false;
+  let tablesFound = false;
+  let statusMessage = 'Not configured';
+
+  if (client) {
+    try {
+      const { data, error } = await client.from('profiles').select('id').limit(1);
+      if (!error) {
+        connected = true;
+        tablesFound = true;
+        statusMessage = 'Connected to Supabase PostgreSQL and tables verified!';
+      } else if (error.message?.includes('schema cache') || error.code === 'PGRST205') {
+        connected = true;
+        tablesFound = false;
+        statusMessage = 'Connected to Supabase project! Ready for schema initialization (run supabase_schema.sql in Supabase SQL editor).';
+      } else {
+        statusMessage = `Supabase responded: ${error.message}`;
+      }
+    } catch (err) {
+      statusMessage = `Connection error: ${err.message}`;
+    }
+  }
+
+  res.json({
+    configured: Boolean(url && (hasKey || hasSecret)),
+    url: url ? url.replace(/https?:\/\//, '').split('.')[0] + '.supabase.co' : '',
+    connected,
+    tablesFound,
+    message: statusMessage
+  });
+});
+
+// -------------------------------------------------------------
+// 2. SMTP Health & Runtime Configuration
 // -------------------------------------------------------------
 app.get('/api/config/smtp', (req, res) => {
   const user = (process.env.GMAIL_USER || '').trim();

@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Retrieve Supabase URL and Anon Key from Vite env or localStorage overrides
-const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+// Retrieve Supabase URL and Publishable/Anon Key from Vite env or localStorage overrides
+const envUrl = (import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || '').trim();
+const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_PUBLISHABLE_KEY || '').trim();
 
 const savedUrl = localStorage.getItem('trackify_supabase_url') || envUrl;
 const savedKey = localStorage.getItem('trackify_supabase_anon_key') || envKey;
@@ -10,7 +10,7 @@ const savedKey = localStorage.getItem('trackify_supabase_anon_key') || envKey;
 export const isSupabaseConfigured = () => {
   const url = localStorage.getItem('trackify_supabase_url') || envUrl;
   const key = localStorage.getItem('trackify_supabase_anon_key') || envKey;
-  return Boolean(url && key && url.startsWith('http') && key.length > 20);
+  return Boolean(url && key && url.startsWith('http') && key.length > 10);
 };
 
 export function getSupabaseCredentials() {

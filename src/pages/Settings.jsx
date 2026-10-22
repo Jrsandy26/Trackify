@@ -64,6 +64,24 @@ export default function Settings() {
         }));
       })
       .catch(() => {});
+
+    // Check initial Supabase status from server
+    fetch('/api/config/supabase')
+      .then(res => res.json())
+      .then(data => {
+        if (data.configured) {
+          setSupabaseForm(prev => ({
+            ...prev,
+            isConfigured: true,
+            url: prev.url || `https://${data.url}`
+          }));
+          setSupabaseStatus({
+            success: data.connected,
+            message: data.message
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleProfileSave = (e) => {
