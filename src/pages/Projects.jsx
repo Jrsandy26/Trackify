@@ -91,7 +91,7 @@ export default function Projects() {
   const { state, dispatch, triggerToast } = useApp();
 
   // View state
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'running' | 'completed' | 'pending' | 'archived'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'myprojects' | 'running' | 'completed' | 'pending' | 'archived'
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [searchQuery, setSearchQuery] = useState(state.searchQuery || '');
   const [sortBy, setSortBy] = useState('progress');
@@ -108,6 +108,17 @@ export default function Projects() {
 
   // Modals & Drawer state
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+
+  // Dynamic entry additions
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [showAddDept, setShowAddDept] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [showAddLead, setShowAddLead] = useState(false);
+  const [newLeadForm, setNewLeadForm] = useState({ name: '', role: 'Project Lead', email: '' });
+
   const [managingProjectId, setManagingProjectId] = useState(null);
   const managingProject = useMemo(() => {
     if (!managingProjectId) return null;
@@ -119,6 +130,7 @@ export default function Projects() {
   const [newProject, setNewProject] = useState({
     name: '',
     category: 'Engineering',
+    department: 'Engineering',
     status: 'running',
     progress: 15,
     dueDate: '2026-11-20',
@@ -134,12 +146,31 @@ export default function Projects() {
   const [drawerNewTaskAssignee, setDrawerNewTaskAssignee] = useState('u1');
   const [drawerNewTaskDue, setDrawerNewTaskDue] = useState('2026-11-15');
 
+  // My Projects Count
+  const myProjectsCount = useMemo(() => {
+    const curId = state.currentUser?.id;
+    const curName = state.currentUser?.name;
+    return (state.projects || []).filter(p =>
+      (curName && p.lead === curName) ||
+      (curId && p.leadId === curId) ||
+      (curId && (p.members || []).includes(curId))
+    ).length;
+  }, [state.projects, state.currentUser]);
+
   // Filtered projects
   const filteredProjects = useMemo(() => {
     let list = state.projects || [];
 
     // Tab filter
-    if (activeTab === 'running') {
+    if (activeTab === 'myprojects') {
+      const curId = state.currentUser?.id;
+      const curName = state.currentUser?.name;
+      list = list.filter(p =>
+        (curName && p.lead === curName) ||
+        (curId && p.leadId === curId) ||
+        (curId && (p.members || []).includes(curId))
+      );
+    } else if (activeTab === 'running') {
       list = list.filter(p => p.status === 'running' && (p.progress || 0) < 100);
     } else if (activeTab === 'completed') {
       list = list.filter(p => p.status === 'ended' || (p.progress || 0) === 100);
@@ -206,7 +237,7 @@ export default function Projects() {
       if (sortBy === 'due') return (a.dueDate || '').localeCompare(b.dueDate || '');
       return 0;
     });
-  }, [state.projects, activeTab, statusFilterChecks, selectedLead, selectedMember, searchTag, dateRange, searchQuery, state.searchQuery, sortBy]);
+  }, [state.projects, activeTab, statusFilterChecks, selectedLead, selectedMember, searchTag, dateRange, searchQuery, state.searchQuery, sortBy, state.currentUser]);
 
   const clearAllFilters = () => {
     setActiveTab('all');
@@ -218,6 +249,105 @@ export default function Projects() {
     setSearchQuery('');
     if (dispatch) dispatch({ type: 'SET_SEARCH', payload: '' });
     if (triggerToast) triggerToast('Filters Cleared', 'Showing all projects without filters.', 'info');
+  };
+
+  // Add Dynamic Field Handlers
+  const handleAddCategory = () => {
+    const val = newCatName.trim();
+    if (!val) return;
+    dispatch({ type: 'ADD_CATEGORY', payload: val });
+    if (editingProject) {
+      setEditingProject(prev => ({ ...prev, category: val }));
+    } else {
+      setNewProject(prev => ({ ...prev, category: val }));
+    }
+    if (triggerToast) triggerToast('Category Added 🏷️', `"${val}" added to categories!`, 'success');
+    setNewCatName('');
+    setShowAddCat(false);
+  };
+
+  const handleAddDepartment = () => {
+    const val = newDeptName.trim();
+    if (!val) return;
+    dispatch({ type: 'ADD_DEPARTMENT', payload: val });
+    if (editingProject) {
+      setEditingProject(prev => ({ ...prev, department: val }));
+    } else {
+      setNewProject(prev => ({ ...prev, department: val }));
+    }
+    if (triggerToast) triggerToast('Department Added 🏢', `"${val}" added to departments!`, 'success');
+    setNewDeptName('');
+    setShowAddDept(false);
+  };
+
+  const handleAddLead = () => {
+    const name = newLeadForm.name.trim();
+    if (!name) return;
+    const newId = `u${Date.now()}`;
+    const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'PL';
+    const memberObj = {
+      id: newId,
+      name,
+      email: newLeadForm.email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@trackify.com`,
+      role: newLeadForm.role.trim() || 'Project Lead',
+      department: (editingProject ? editingProject.department : newProject.department) || 'Engineering',
+      color: '#6366f1',
+      initials
+    };
+    dispatch({ type: 'ADD_MEMBER', payload: memberObj });
+    if (editingProject) {
+      setEditingProject(prev => ({ ...prev, lead: memberObj.name, leadId: memberObj.id }));
+    } else {
+      setNewProject(prev => ({ ...prev, lead: memberObj.name }));
+    }
+    if (triggerToast) triggerToast('Project Lead Added 👤', `${memberObj.name} is now available as lead!`, 'success');
+    setNewLeadForm({ name: '', role: 'Project Lead', email: '' });
+    setShowAddLead(false);
+  };
+
+  // Delete Project Confirmation
+  const confirmDeleteProject = () => {
+    if (!projectToDelete) return;
+    dispatch({ type: 'DELETE_PROJECT', payload: projectToDelete.id });
+    if (triggerToast) triggerToast('Project Deleted 🗑️', `"${projectToDelete.name}" and associated tasks removed.`, 'info');
+    if (managingProjectId === projectToDelete.id) {
+      setManagingProjectId(null);
+    }
+    setProjectToDelete(null);
+  };
+
+  // Update Project Handler
+  const handleUpdateProjectSubmit = (e) => {
+    e.preventDefault();
+    if (!editingProject || !editingProject.name.trim()) return;
+
+    let formattedDue = editingProject.dueDate;
+    if (editingProject.rawDueDate) {
+      try {
+        const parts = editingProject.rawDueDate.split('-');
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          formattedDue = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+      } catch {
+        formattedDue = editingProject.rawDueDate;
+      }
+    }
+
+    const leadUser = state.users.find(u => u.name === editingProject.lead || u.id === editingProject.leadId);
+
+    dispatch({
+      type: 'UPDATE_PROJECT',
+      payload: {
+        ...editingProject,
+        name: editingProject.name.trim(),
+        dueDate: formattedDue,
+        leadId: leadUser ? leadUser.id : editingProject.leadId
+      }
+    });
+
+    if (triggerToast) triggerToast('Project Updated ✎', `"${editingProject.name}" saved successfully!`, 'success');
+    setEditingProject(null);
   };
 
 
@@ -436,6 +566,9 @@ export default function Projects() {
               <button className={`status-tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
                 All Projects ({totalCount})
               </button>
+              <button className={`status-tab ${activeTab === 'myprojects' ? 'active' : ''}`} onClick={() => setActiveTab('myprojects')}>
+                ⭐ My Projects ({myProjectsCount})
+              </button>
               <button className={`status-tab ${activeTab === 'running' ? 'active' : ''}`} onClick={() => setActiveTab('running')}>
                 Running ({runningCount})
               </button>
@@ -536,13 +669,25 @@ export default function Projects() {
                         <span className="project-heading">{proj.name}</span>
                         <span className={`status-chip ${statusMeta.class}`}>{statusMeta.label}</span>
                       </div>
-                      <button
-                        className="card-dots-btn"
-                        onClick={(e) => { e.stopPropagation(); setManagingProject(proj); }}
-                        title="Manage Project & Tasks"
-                      >
-                        •••
-                      </button>
+                      <div className="card-quick-actions" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="card-quick-btn edit"
+                          onClick={() => setEditingProject({
+                            ...proj,
+                            rawDueDate: proj.rawDueDate || (proj.dueDate?.includes('-') ? proj.dueDate : '2026-11-20')
+                          })}
+                          title="Edit Project"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="card-quick-btn delete"
+                          onClick={() => setProjectToDelete(proj)}
+                          title="Delete Project"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
 
                     <p className="project-card-description">
@@ -699,13 +844,32 @@ export default function Projects() {
                           </div>
                         </td>
                         <td>
-                          <button
-                            className="btn-manage-table"
-                            onClick={(e) => { e.stopPropagation(); setManagingProject(p); }}
-                            title="Manage Tasks & Details"
-                          >
-                            Manage
-                          </button>
+                          <div className="table-actions-cluster" onClick={e => e.stopPropagation()}>
+                            <button
+                              className="btn-manage-table"
+                              onClick={() => setManagingProject(p)}
+                              title="Manage Tasks & Details"
+                            >
+                              Manage
+                            </button>
+                            <button
+                              className="btn-table-icon-edit"
+                              onClick={() => setEditingProject({
+                                ...p,
+                                rawDueDate: p.rawDueDate || (p.dueDate?.includes('-') ? p.dueDate : '2026-11-20')
+                              })}
+                              title="Edit Project"
+                            >
+                              ✎
+                            </button>
+                            <button
+                              className="btn-table-icon-delete"
+                              onClick={() => setProjectToDelete(p)}
+                              title="Delete Project"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -875,7 +1039,28 @@ export default function Projects() {
                   <span className="drawer-lead-pill">Lead: {managingProject.lead || 'Priya Raman'}</span>
                 </div>
               </div>
-              <button className="drawer-close-btn" onClick={() => setManagingProject(null)}>✕</button>
+              <div className="drawer-header-actions">
+                <button
+                  className="btn-drawer-header-action edit"
+                  onClick={() => {
+                    setEditingProject({
+                      ...managingProject,
+                      rawDueDate: managingProject.rawDueDate || (managingProject.dueDate?.includes('-') ? managingProject.dueDate : '2026-11-20')
+                    });
+                  }}
+                  title="Edit Project Details"
+                >
+                  ✎ Edit
+                </button>
+                <button
+                  className="btn-drawer-header-action delete"
+                  onClick={() => setProjectToDelete(managingProject)}
+                  title="Delete Project"
+                >
+                  🗑️ Delete
+                </button>
+                <button className="drawer-close-btn" onClick={() => setManagingProject(null)}>✕</button>
+              </div>
             </div>
 
             {/* Overall Project Progress Slider */}
@@ -930,6 +1115,16 @@ export default function Projects() {
                       <div className="task-meta-right">
                         <span className={`status-badge status-${task.status}`}>{task.status}</span>
                         <span className="task-due-date">{task.dueDate}</span>
+                        <button
+                          className="btn-drawer-task-delete"
+                          onClick={() => {
+                            dispatch({ type: 'DELETE_TASK', payload: task.id });
+                            if (triggerToast) triggerToast('Task Deleted 🗑️', `"${task.title}" was removed.`, 'info');
+                          }}
+                          title="Delete Task"
+                        >
+                          ✕
+                        </button>
                       </div>
                     </div>
 
@@ -1080,34 +1275,125 @@ export default function Projects() {
                 </div>
               </div>
 
+              {/* Dynamic Category & Department Row */}
               <div className="form-two-col-row">
                 <div className="form-field-group">
-                  <label className="field-label">Category</label>
-                  <select
-                    value={newProject.category}
-                    onChange={e => setNewProject({ ...newProject, category: e.target.value })}
-                    className="modern-select-input"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Design">UI/UX Design</option>
-                    <option value="Mobile">Mobile Apps</option>
-                    <option value="Security">Security & Auth</option>
-                    <option value="Marketing">Marketing & Launch</option>
-                  </select>
+                  <div className="field-label-with-action">
+                    <label className="field-label">Category</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddCat(!showAddCat)}
+                    >
+                      {showAddCat ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddCat ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Enter category name..."
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={handleAddCategory}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={newProject.category}
+                      onChange={e => setNewProject({ ...newProject, category: e.target.value })}
+                      className="modern-select-input"
+                    >
+                      {(state.categories || ['Engineering', 'Design', 'Mobile', 'Security', 'Marketing', 'Product', 'Operations']).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="form-field-group">
+                  <div className="field-label-with-action">
+                    <label className="field-label">Department</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddDept(!showAddDept)}
+                    >
+                      {showAddDept ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddDept ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Enter department name..."
+                        value={newDeptName}
+                        onChange={e => setNewDeptName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={handleAddDepartment}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={newProject.department || 'Engineering'}
+                      onChange={e => setNewProject({ ...newProject, department: e.target.value })}
+                      className="modern-select-input"
+                    >
+                      {(state.departments || ['Engineering', 'Design', 'Product', 'Marketing', 'Mobile', 'Security', 'Operations', 'General']).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {/* Dynamic Project Lead Row */}
+              <div className="form-field-group">
+                <div className="field-label-with-action">
                   <label className="field-label">Project Lead</label>
+                  <button
+                    type="button"
+                    className="btn-inline-add-field"
+                    onClick={() => setShowAddLead(!showAddLead)}
+                  >
+                    {showAddLead ? 'Cancel' : '+ New Lead'}
+                  </button>
+                </div>
+                {showAddLead ? (
+                  <div className="inline-add-lead-box">
+                    <div className="lead-inputs-row">
+                      <input
+                        type="text"
+                        placeholder="Lead full name"
+                        value={newLeadForm.name}
+                        onChange={e => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <input
+                        type="text"
+                        placeholder="Role / Title"
+                        value={newLeadForm.role}
+                        onChange={e => setNewLeadForm({ ...newLeadForm, role: e.target.value })}
+                        className="modern-text-input small"
+                      />
+                    </div>
+                    <button type="button" className="btn-save-inline-field" onClick={handleAddLead}>Add & Select Lead</button>
+                  </div>
+                ) : (
                   <select
                     value={newProject.lead}
                     onChange={e => setNewProject({ ...newProject, lead: e.target.value })}
                     className="modern-select-input"
                   >
                     {state.users.map(u => (
-                      <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
+                      <option key={u.id} value={u.name}>{u.name} ({u.role || 'Team'})</option>
                     ))}
                   </select>
-                </div>
+                )}
               </div>
 
               <div className="form-two-col-row">
@@ -1139,11 +1425,268 @@ export default function Projects() {
                 </div>
               </div>
 
+              <div className="form-field-group">
+                <label className="field-label">Description (Optional)</label>
+                <textarea
+                  placeholder="Project scope, key deliverables and milestones..."
+                  value={newProject.description}
+                  onChange={e => setNewProject({ ...newProject, description: e.target.value })}
+                  className="modern-text-input"
+                  rows={2}
+                />
+              </div>
+
               <div className="modern-modal-actions">
                 <button type="button" className="btn-modern-ghost" onClick={() => setShowNewProjectModal(false)}>Cancel</button>
                 <button type="submit" className="btn-modern-primary">Create Project</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PROJECT MODAL */}
+      {editingProject && (
+        <div className="modern-modal-backdrop" onClick={() => setEditingProject(null)}>
+          <div className="modern-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modern-modal-header">
+              <div className="header-badge-icon edit">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </div>
+              <div className="header-title-wrap">
+                <h2>Edit Project</h2>
+                <p>Update title, category, lead, schedule or milestone progress.</p>
+              </div>
+              <button className="modern-modal-close" onClick={() => setEditingProject(null)}>✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateProjectSubmit} className="modern-modal-form">
+              <div className="form-field-group">
+                <label className="field-label">Project Name *</label>
+                <input
+                  type="text"
+                  value={editingProject.name}
+                  onChange={e => setEditingProject({ ...editingProject, name: e.target.value })}
+                  className="modern-text-input"
+                  required
+                />
+              </div>
+
+              <div className="form-field-group">
+                <label className="field-label">Theme & Icon</label>
+                <div className="theme-chips-grid">
+                  {PROJECT_THEMES.map(theme => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      className={`theme-chip-btn ${editingProject.iconType === theme.id ? 'selected' : ''}`}
+                      onClick={() => setEditingProject({ ...editingProject, iconType: theme.id, color: theme.color })}
+                      style={{ '--chip-color': theme.color }}
+                    >
+                      <span className="chip-icon-box">{theme.icon}</span>
+                      <span className="chip-name">{theme.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-two-col-row">
+                <div className="form-field-group">
+                  <div className="field-label-with-action">
+                    <label className="field-label">Category</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddCat(!showAddCat)}
+                    >
+                      {showAddCat ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddCat ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="New category..."
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={handleAddCategory}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editingProject.category || 'Engineering'}
+                      onChange={e => setEditingProject({ ...editingProject, category: e.target.value })}
+                      className="modern-select-input"
+                    >
+                      {(state.categories || ['Engineering', 'Design', 'Mobile', 'Security', 'Marketing', 'Product', 'Operations']).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="form-field-group">
+                  <div className="field-label-with-action">
+                    <label className="field-label">Department</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddDept(!showAddDept)}
+                    >
+                      {showAddDept ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddDept ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="New department..."
+                        value={newDeptName}
+                        onChange={e => setNewDeptName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={handleAddDepartment}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editingProject.department || 'Engineering'}
+                      onChange={e => setEditingProject({ ...editingProject, department: e.target.value })}
+                      className="modern-select-input"
+                    >
+                      {(state.departments || ['Engineering', 'Design', 'Product', 'Marketing', 'Mobile', 'Security', 'Operations', 'General']).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-two-col-row">
+                <div className="form-field-group">
+                  <div className="field-label-with-action">
+                    <label className="field-label">Project Lead</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddLead(!showAddLead)}
+                    >
+                      {showAddLead ? 'Cancel' : '+ New Lead'}
+                    </button>
+                  </div>
+                  {showAddLead ? (
+                    <div className="inline-add-lead-box">
+                      <div className="lead-inputs-row">
+                        <input
+                          type="text"
+                          placeholder="Lead full name"
+                          value={newLeadForm.name}
+                          onChange={e => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
+                          className="modern-text-input small"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          placeholder="Role"
+                          value={newLeadForm.role}
+                          onChange={e => setNewLeadForm({ ...newLeadForm, role: e.target.value })}
+                          className="modern-text-input small"
+                        />
+                      </div>
+                      <button type="button" className="btn-save-inline-field" onClick={handleAddLead}>Add & Select Lead</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editingProject.lead}
+                      onChange={e => setEditingProject({ ...editingProject, lead: e.target.value })}
+                      className="modern-select-input"
+                    >
+                      {state.users.map(u => (
+                        <option key={u.id} value={u.name}>{u.name} ({u.role || 'Team'})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="form-field-group">
+                  <label className="field-label">Status</label>
+                  <select
+                    value={editingProject.status || 'running'}
+                    onChange={e => setEditingProject({ ...editingProject, status: e.target.value })}
+                    className="modern-select-input"
+                  >
+                    <option value="running">Running</option>
+                    <option value="ended">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-two-col-row">
+                <div className="form-field-group">
+                  <label className="field-label">Due Date</label>
+                  <input
+                    type="date"
+                    value={editingProject.rawDueDate || ''}
+                    onChange={e => setEditingProject({ ...editingProject, rawDueDate: e.target.value })}
+                    className="modern-text-input"
+                  />
+                </div>
+
+                <div className="form-field-group">
+                  <div className="progress-label-row">
+                    <label className="field-label">Progress</label>
+                    <span className="progress-pct-value">{editingProject.progress || 0}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={editingProject.progress || 0}
+                    onChange={e => setEditingProject({ ...editingProject, progress: Number(e.target.value) })}
+                    className="modern-range-slider"
+                  />
+                </div>
+              </div>
+
+              <div className="form-field-group">
+                <label className="field-label">Description</label>
+                <textarea
+                  value={editingProject.description || ''}
+                  onChange={e => setEditingProject({ ...editingProject, description: e.target.value })}
+                  className="modern-text-input"
+                  rows={2}
+                />
+              </div>
+
+              <div className="modern-modal-actions">
+                <button type="button" className="btn-modern-ghost" onClick={() => setEditingProject(null)}>Cancel</button>
+                <button type="submit" className="btn-modern-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PROJECT CONFIRMATION MODAL */}
+      {projectToDelete && (
+        <div className="modern-modal-backdrop" onClick={() => setProjectToDelete(null)}>
+          <div className="modern-modal-card danger-modal" onClick={e => e.stopPropagation()}>
+            <div className="danger-modal-icon-badge">
+              🗑️
+            </div>
+            <h2>Delete Project?</h2>
+            <p>
+              Are you sure you want to delete <strong>"{projectToDelete.name}"</strong>? All associated tasks will also be removed. This action cannot be undone.
+            </p>
+            <div className="danger-modal-actions">
+              <button className="btn-modern-ghost" onClick={() => setProjectToDelete(null)}>Cancel</button>
+              <button className="btn-danger-confirm" onClick={confirmDeleteProject}>Delete Project</button>
+            </div>
           </div>
         </div>
       )}

@@ -39,6 +39,9 @@ const getStoredTasks = () => {
   return t;
 };
 
+const initialCategories = ['Engineering', 'Design', 'Mobile', 'Security', 'Marketing', 'Product', 'Operations'];
+const initialDepartments = ['Engineering', 'Design', 'Product', 'Marketing', 'Mobile', 'Security', 'Operations', 'General'];
+
 const initialState = {
   isAuthenticated: getFromStorage('trackify_auth', true),
   currentUser: getStoredUser(),
@@ -46,6 +49,8 @@ const initialState = {
   projects: getStoredProjects(),
   tasks: getStoredTasks(),
   todos: getFromStorage('trackify_todos', initialTodos),
+  categories: getFromStorage('trackify_categories', initialCategories),
+  departments: getFromStorage('trackify_departments', initialDepartments),
   notifications: getFromStorage('trackify_notifications', initialNotifications),
   reminders: getFromStorage('trackify_reminders', initialReminders),
   settings: getFromStorage('trackify_settings', {
@@ -263,9 +268,68 @@ function appReducer(state, action) {
         ...state,
         projects: state.projects.map(p => p.id === action.payload.id ? { ...p, ...action.payload } : p)
       };
+    case 'DELETE_PROJECT':
+      return {
+        ...state,
+        projects: state.projects.filter(p => p.id !== action.payload),
+        tasks: state.tasks.filter(t => t.project !== action.payload)
+      };
+    case 'ADD_CATEGORY': {
+      const cat = (action.payload || '').trim();
+      if (!cat || (state.categories || []).includes(cat)) return state;
+      return { ...state, categories: [...(state.categories || []), cat] };
+    }
+    case 'ADD_DEPARTMENT': {
+      const dept = (action.payload || '').trim();
+      if (!dept || (state.departments || []).includes(dept)) return state;
+      return { ...state, departments: [...(state.departments || []), dept] };
+    }
     case 'ADD_MEMBER': {
       const newMember = action.payload;
       return { ...state, users: [...state.users, newMember] };
+    }
+    case 'DELETE_MEMBER': {
+      const memberId = action.payload;
+      return {
+        ...state,
+        users: state.users.filter(u => u.id !== memberId),
+        projects: state.projects.map(p => ({
+          ...p,
+          members: (p.members || []).filter(mId => mId !== memberId)
+        })),
+        tasks: state.tasks.map(t => t.assignee === memberId ? { ...t, assignee: '' } : t)
+      };
+    }
+    case 'REMOVE_MEMBER_FROM_PROJECT': {
+      const { projectId, memberId } = action.payload;
+      return {
+        ...state,
+        projects: state.projects.map(p => {
+          if (p.id === projectId) {
+            return {
+              ...p,
+              members: (p.members || []).filter(mId => mId !== memberId)
+            };
+          }
+          return p;
+        })
+      };
+    }
+    case 'CHANGE_MEMBER_PROJECT': {
+      const { memberId, oldProjectId, newProjectId } = action.payload;
+      return {
+        ...state,
+        projects: state.projects.map(p => {
+          if (p.id === oldProjectId) {
+            return { ...p, members: (p.members || []).filter(mId => mId !== memberId) };
+          }
+          if (p.id === newProjectId) {
+            const current = p.members || [];
+            return { ...p, members: current.includes(memberId) ? current : [...current, memberId] };
+          }
+          return p;
+        })
+      };
     }
     case 'UPDATE_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.payload } };
@@ -318,6 +382,8 @@ export function AppProvider({ children }) {
     localStorage.setItem('trackify_projects', JSON.stringify(state.projects));
     localStorage.setItem('trackify_tasks', JSON.stringify(state.tasks));
     localStorage.setItem('trackify_todos', JSON.stringify(state.todos));
+    localStorage.setItem('trackify_categories', JSON.stringify(state.categories));
+    localStorage.setItem('trackify_departments', JSON.stringify(state.departments));
     localStorage.setItem('trackify_notifications', JSON.stringify(state.notifications));
     localStorage.setItem('trackify_reminders', JSON.stringify(state.reminders));
     localStorage.setItem('trackify_settings', JSON.stringify(state.settings));

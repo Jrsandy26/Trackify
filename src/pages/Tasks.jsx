@@ -18,7 +18,18 @@ const priorityColors = {
 export default function Tasks() {
   const { state, dispatch, triggerToast } = useApp();
   const [showNewTask, setShowNewTask] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
   const [filter, setFilter] = useState('all');
+
+  // Inline additions for predefined fields
+  const [showAddAssignee, setShowAddAssignee] = useState(false);
+  const [inlineMemberName, setInlineMemberName] = useState('');
+  const [inlineMemberRole, setInlineMemberRole] = useState('Developer');
+
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [inlineProjectName, setInlineProjectName] = useState('');
+
   const [newTask, setNewTask] = useState({
     title: '', description: '', priority: 'medium', assignee: '', project: '', dueDate: ''
   });
@@ -84,6 +95,63 @@ export default function Tasks() {
     }
   };
 
+  // Add Dynamic Member Inline Handler
+  const handleAddNewMemberInline = (isEditing = false) => {
+    if (!inlineMemberName.trim()) return;
+    const newId = `u${Date.now()}`;
+    const initials = inlineMemberName.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'TM';
+    const memberObj = {
+      id: newId,
+      name: inlineMemberName.trim(),
+      email: `${inlineMemberName.toLowerCase().replace(/\s+/g, '.')}@trackify.com`,
+      role: inlineMemberRole || 'Developer',
+      department: 'Engineering',
+      color: '#10b981',
+      initials
+    };
+    dispatch({ type: 'ADD_MEMBER', payload: memberObj });
+    if (isEditing) {
+      setEditingTask(prev => ({ ...prev, assignee: newId }));
+    } else {
+      setNewTask(prev => ({ ...prev, assignee: newId }));
+    }
+    if (triggerToast) triggerToast('Member Added 👤', `${memberObj.name} added to workspace!`, 'success');
+    setInlineMemberName('');
+    setShowAddAssignee(false);
+  };
+
+  // Add Dynamic Project Inline Handler
+  const handleAddNewProjectInline = (isEditing = false) => {
+    if (!inlineProjectName.trim()) return;
+    const newProjId = `p${Date.now()}`;
+    const projObj = {
+      id: newProjId,
+      name: inlineProjectName.trim(),
+      status: 'running',
+      progress: 0,
+      taskCount: '0/1',
+      startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      dueDate: 'Nov 30, 2026',
+      lead: state.currentUser?.name || 'Sandeep Sai',
+      leadId: state.currentUser?.id || 'u0',
+      members: [state.currentUser?.id || 'u0'],
+      description: `${inlineProjectName.trim()} initiative`,
+      color: '#6366f1',
+      iconType: 'stripes',
+      category: 'Engineering'
+    };
+    dispatch({ type: 'ADD_PROJECT', payload: projObj });
+    if (isEditing) {
+      setEditingTask(prev => ({ ...prev, project: newProjId }));
+    } else {
+      setNewTask(prev => ({ ...prev, project: newProjId }));
+    }
+    if (triggerToast) triggerToast('Project Added 📁', `"${projObj.name}" created!`, 'success');
+    setInlineProjectName('');
+    setShowAddProject(false);
+  };
+
+  // Add Task Handler
   const handleAddTask = (e) => {
     e.preventDefault();
     if (!newTask.title) return;
@@ -102,9 +170,39 @@ export default function Tasks() {
         tags: []
       }
     });
-    if (triggerToast) triggerToast('Task Created', `"${newTask.title}" added to To Do!`, 'success');
+    if (triggerToast) triggerToast('Task Created 🎉', `"${newTask.title}" added to To Do!`, 'success');
     setNewTask({ title: '', description: '', priority: 'medium', assignee: '', project: '', dueDate: '' });
     setShowNewTask(false);
+  };
+
+  // Update Task Handler
+  const handleUpdateTask = (e) => {
+    e.preventDefault();
+    if (!editingTask || !editingTask.title.trim()) return;
+    dispatch({
+      type: 'UPDATE_TASK',
+      payload: {
+        id: editingTask.id,
+        title: editingTask.title.trim(),
+        description: editingTask.description,
+        status: editingTask.status || 'todo',
+        priority: editingTask.priority || 'medium',
+        assignee: editingTask.assignee,
+        project: editingTask.project,
+        dueDate: editingTask.dueDate
+      }
+    });
+    if (triggerToast) triggerToast('Task Updated ✎', `"${editingTask.title}" updated successfully!`, 'success');
+    setEditingTask(null);
+  };
+
+  // Delete Task Handler
+  const handleDeleteTask = (taskId, taskTitle) => {
+    dispatch({ type: 'DELETE_TASK', payload: taskId });
+    if (triggerToast) triggerToast('Task Deleted 🗑️', `"${taskTitle || 'Task'}" removed.`, 'info');
+    if (taskToDelete && taskToDelete.id === taskId) {
+      setTaskToDelete(null);
+    }
   };
 
   const getAssignee = (id) => state.users.find(u => u.id === id);
@@ -122,11 +220,11 @@ export default function Tasks() {
       <div className="page-header">
         <div>
           <h1>Tasks</h1>
-          <p className="page-subtitle">Manage and track your team's tasks</p>
+          <p className="page-subtitle">Manage, create, edit and track all your team's tasks</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowNewTask(true)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Task
+          + New Task
         </button>
       </div>
 
@@ -143,7 +241,7 @@ export default function Tasks() {
         ))}
       </div>
 
-      {/* New Task Modal */}
+      {/* CREATE NEW TASK MODAL */}
       {showNewTask && (
         <div className="modal-overlay" onClick={() => setShowNewTask(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -153,13 +251,13 @@ export default function Tasks() {
             </div>
             <form onSubmit={handleAddTask} className="modal-form">
               <div className="form-group">
-                <label>Task Title</label>
+                <label>Task Title *</label>
                 <input type="text" placeholder="Enter task title" value={newTask.title}
-                  onChange={e => setNewTask({ ...newTask, title: e.target.value })} autoFocus />
+                  onChange={e => setNewTask({ ...newTask, title: e.target.value })} autoFocus required />
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea placeholder="Task description..." value={newTask.description}
+                <textarea placeholder="Task details, requirements..." value={newTask.description}
                   onChange={e => setNewTask({ ...newTask, description: e.target.value })} rows={3} />
               </div>
               <div className="form-row">
@@ -177,27 +275,232 @@ export default function Tasks() {
                     onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })} />
                 </div>
               </div>
+
+              {/* Dynamic Assignee and Project */}
               <div className="form-row">
                 <div className="form-group">
-                  <label>Assignee</label>
-                  <select value={newTask.assignee} onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}>
-                    <option value="">Select assignee</option>
-                    {state.users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
+                  <div className="field-label-with-action">
+                    <label>Assignee</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddAssignee(!showAddAssignee)}
+                    >
+                      {showAddAssignee ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddAssignee ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Member name..."
+                        value={inlineMemberName}
+                        onChange={e => setInlineMemberName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={() => handleAddNewMemberInline(false)}>Add</button>
+                    </div>
+                  ) : (
+                    <select value={newTask.assignee} onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}>
+                      <option value="">Select assignee</option>
+                      {state.users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role || 'Member'})</option>)}
+                    </select>
+                  )}
                 </div>
+
                 <div className="form-group">
-                  <label>Project</label>
-                  <select value={newTask.project} onChange={e => setNewTask({ ...newTask, project: e.target.value })}>
-                    <option value="">Select project</option>
-                    {state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  <div className="field-label-with-action">
+                    <label>Project</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddProject(!showAddProject)}
+                    >
+                      {showAddProject ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddProject ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Project name..."
+                        value={inlineProjectName}
+                        onChange={e => setInlineProjectName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={() => handleAddNewProjectInline(false)}>Add</button>
+                    </div>
+                  ) : (
+                    <select value={newTask.project} onChange={e => setNewTask({ ...newTask, project: e.target.value })}>
+                      <option value="">Select project</option>
+                      {state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
+
               <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setShowNewTask(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Create Task</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TASK MODAL */}
+      {editingTask && (
+        <div className="modal-overlay" onClick={() => setEditingTask(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit Task</h2>
+              <button className="modal-close" onClick={() => setEditingTask(null)}>✕</button>
+            </div>
+            <form onSubmit={handleUpdateTask} className="modal-form">
+              <div className="form-group">
+                <label>Task Title *</label>
+                <input
+                  type="text"
+                  value={editingTask.title}
+                  onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  value={editingTask.description || ''}
+                  onChange={e => setEditingTask({ ...editingTask, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    value={editingTask.status || 'todo'}
+                    onChange={e => setEditingTask({ ...editingTask, status: e.target.value })}
+                  >
+                    <option value="todo">📋 To Do</option>
+                    <option value="inprogress">🔄 In Progress</option>
+                    <option value="inreview">👀 In Review</option>
+                    <option value="done">✅ Done</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Priority</label>
+                  <select
+                    value={editingTask.priority || 'medium'}
+                    onChange={e => setEditingTask({ ...editingTask, priority: e.target.value })}
+                  >
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <div className="field-label-with-action">
+                    <label>Assignee</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddAssignee(!showAddAssignee)}
+                    >
+                      {showAddAssignee ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddAssignee ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Member name..."
+                        value={inlineMemberName}
+                        onChange={e => setInlineMemberName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={() => handleAddNewMemberInline(true)}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editingTask.assignee || ''}
+                      onChange={e => setEditingTask({ ...editingTask, assignee: e.target.value })}
+                    >
+                      <option value="">Select assignee</option>
+                      {state.users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <div className="field-label-with-action">
+                    <label>Project</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddProject(!showAddProject)}
+                    >
+                      {showAddProject ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddProject ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Project name..."
+                        value={inlineProjectName}
+                        onChange={e => setInlineProjectName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={() => handleAddNewProjectInline(true)}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editingTask.project || ''}
+                      onChange={e => setEditingTask({ ...editingTask, project: e.target.value })}
+                    >
+                      <option value="">Select project</option>
+                      {state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Due Date</label>
+                <input
+                  type="date"
+                  value={editingTask.dueDate || ''}
+                  onChange={e => setEditingTask({ ...editingTask, dueDate: e.target.value })}
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn btn-ghost" onClick={() => setEditingTask(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE TASK CONFIRMATION MODAL */}
+      {taskToDelete && (
+        <div className="modal-overlay" onClick={() => setTaskToDelete(null)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="danger-modal-icon-badge">🗑️</div>
+            <h2>Delete Task?</h2>
+            <p>Are you sure you want to delete <strong>"{taskToDelete.title}"</strong>? This action cannot be undone.</p>
+            <div className="modal-actions" style={{ justifyContent: 'center', marginTop: '16px' }}>
+              <button className="btn btn-ghost" onClick={() => setTaskToDelete(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={() => handleDeleteTask(taskToDelete.id, taskToDelete.title)}>Delete Task</button>
+            </div>
           </div>
         </div>
       )}
@@ -245,27 +548,49 @@ export default function Tasks() {
                                       <span key={tag} className="tag-badge">{tag}</span>
                                     ))}
                                   </div>
-                                  <div className="card-stage-buttons">
-                                    {col.id !== 'todo' && (
+
+                                  <div className="card-top-right-group">
+                                    <div className="card-action-icons">
                                       <button
                                         type="button"
-                                        className="btn-card-step prev"
-                                        onClick={(e) => { e.stopPropagation(); moveTaskStep(task.id, col.id, 'prev'); }}
-                                        title="Move back 1 column"
+                                        className="btn-card-icon edit"
+                                        onClick={(e) => { e.stopPropagation(); setEditingTask(task); }}
+                                        title="Edit Task"
                                       >
-                                        ‹
+                                        ✎
                                       </button>
-                                    )}
-                                    {col.id !== 'done' && (
                                       <button
                                         type="button"
-                                        className="btn-card-step next"
-                                        onClick={(e) => { e.stopPropagation(); moveTaskStep(task.id, col.id, 'next'); }}
-                                        title="Move forward 1 column"
+                                        className="btn-card-icon delete"
+                                        onClick={(e) => { e.stopPropagation(); setTaskToDelete(task); }}
+                                        title="Delete Task"
                                       >
-                                        ›
+                                        🗑️
                                       </button>
-                                    )}
+                                    </div>
+
+                                    <div className="card-stage-buttons">
+                                      {col.id !== 'todo' && (
+                                        <button
+                                          type="button"
+                                          className="btn-card-step prev"
+                                          onClick={(e) => { e.stopPropagation(); moveTaskStep(task.id, col.id, 'prev'); }}
+                                          title="Move back 1 column"
+                                        >
+                                          ‹
+                                        </button>
+                                      )}
+                                      {col.id !== 'done' && (
+                                        <button
+                                          type="button"
+                                          className="btn-card-step next"
+                                          onClick={(e) => { e.stopPropagation(); moveTaskStep(task.id, col.id, 'next'); }}
+                                          title="Move forward 1 column"
+                                        >
+                                          ›
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 <h4 className="kanban-card-title">{task.title}</h4>
@@ -275,7 +600,7 @@ export default function Tasks() {
                                 <div className="kanban-card-footer">
                                   <div className="kanban-card-meta">
                                     {assignee && (
-                                      <div className="kanban-assignee" style={{ background: assignee.color }}>
+                                      <div className="kanban-assignee" style={{ background: assignee.color }} title={assignee.name}>
                                         {assignee.initials}
                                       </div>
                                     )}

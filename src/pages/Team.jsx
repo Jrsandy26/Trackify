@@ -21,6 +21,86 @@ export default function Team() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [showAssignTask, setShowAssignTask] = useState(false);
   const [assignTask, setAssignTask] = useState({ title: '', priority: 'medium', dueDate: '' });
+  const [memberToDelete, setMemberToDelete] = useState(null);
+
+  // Dynamic additions
+  const [showAddDept, setShowAddDept] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [showAddProj, setShowAddProj] = useState(false);
+  const [newProjName, setNewProjName] = useState('');
+
+  // Remove member from project
+  const handleRemoveMemberFromProject = (memberId, projectId, memberName, projectName) => {
+    dispatch({
+      type: 'REMOVE_MEMBER_FROM_PROJECT',
+      payload: { memberId, projectId }
+    });
+    if (triggerToast) triggerToast('Project Removed ✕', `${memberName || 'Member'} removed from ${projectName || 'Project'}.`, 'info');
+  };
+
+  // Assign member to project
+  const handleAddMemberToProject = (memberId, projectId, memberName) => {
+    dispatch({
+      type: 'ADD_MEMBER_TO_PROJECT',
+      payload: { memberId, projectId }
+    });
+    const proj = state.projects.find(p => p.id === projectId);
+    if (triggerToast) triggerToast('Project Assigned 📁', `${memberName || 'Member'} assigned to ${proj?.name || 'Project'}.`, 'success');
+  };
+
+  // Delete member from workspace
+  const handleDeleteMember = () => {
+    if (!memberToDelete) return;
+    if (memberToDelete.id === state.currentUser?.id) {
+      if (triggerToast) triggerToast('Action Prevented', 'You cannot delete the active logged-in user account.', 'warning');
+      setMemberToDelete(null);
+      return;
+    }
+    const name = memberToDelete.name;
+    dispatch({ type: 'DELETE_MEMBER', payload: memberToDelete.id });
+    if (triggerToast) triggerToast('Member Removed 🗑️', `${name} removed from team & workspace.`, 'info');
+    if (selectedMember && selectedMember.id === memberToDelete.id) {
+      setSelectedMember(null);
+    }
+    setMemberToDelete(null);
+  };
+
+  const handleAddNewDept = () => {
+    const val = newDeptName.trim();
+    if (!val) return;
+    dispatch({ type: 'ADD_DEPARTMENT', payload: val });
+    setInviteForm(prev => ({ ...prev, department: val }));
+    if (triggerToast) triggerToast('Department Added 🏢', `"${val}" added to departments!`, 'success');
+    setNewDeptName('');
+    setShowAddDept(false);
+  };
+
+  const handleAddNewProj = () => {
+    const val = newProjName.trim();
+    if (!val) return;
+    const newId = `p${Date.now()}`;
+    const projPayload = {
+      id: newId,
+      name: val,
+      status: 'running',
+      progress: 0,
+      taskCount: '0/1',
+      startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      dueDate: 'Nov 30, 2026',
+      lead: state.currentUser?.name || 'Sandeep Sai',
+      leadId: state.currentUser?.id || 'u0',
+      members: [state.currentUser?.id || 'u0'],
+      description: `${val} project`,
+      color: '#4f46e5',
+      iconType: 'stripes',
+      category: 'Engineering'
+    };
+    dispatch({ type: 'ADD_PROJECT', payload: projPayload });
+    setInviteForm(prev => ({ ...prev, project: val }));
+    if (triggerToast) triggerToast('Project Created 📁', `"${val}" added to workspace!`, 'success');
+    setNewProjName('');
+    setShowAddProj(false);
+  };
 
   // Quick domain chips
   const domains = ['@gmail.com', '@outlook.com', '@hotmail.com'];
@@ -319,6 +399,8 @@ export default function Team() {
       <div className="team-grid">
         {state.users.map(member => {
           const tasks = getMemberTasks(member.id);
+          const memberProjects = (state.projects || []).filter(p => (p.members || []).includes(member.id));
+
           return (
             <div key={member.id} className="team-card">
               <div className="team-card-top">
@@ -329,6 +411,56 @@ export default function Team() {
                 <p className="team-member-role">{member.role}</p>
                 <span className="team-dept-badge">{member.department || 'General'}</span>
               </div>
+
+              {/* Assigned Projects Section */}
+              <div className="team-card-projects-section">
+                <div className="projects-section-title-row">
+                  <span className="mini-section-label">Assigned Projects ({memberProjects.length})</span>
+                </div>
+                <div className="member-project-tags-list">
+                  {memberProjects.length === 0 ? (
+                    <span className="no-projects-hint">No projects assigned</span>
+                  ) : (
+                    memberProjects.map(p => (
+                      <span key={p.id} className="member-proj-tag" style={{ '--tag-color': p.color || '#4f46e5' }}>
+                        <span className="tag-proj-name">{p.name}</span>
+                        <button
+                          type="button"
+                          className="btn-remove-proj-tag"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveMemberFromProject(member.id, p.id, member.name, p.name);
+                          }}
+                          title={`Remove ${member.name} from ${p.name}`}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+
+                {/* Project Assign / Change selector */}
+                <div className="assign-project-dropdown-row">
+                  <select
+                    className="select-assign-project"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      handleAddMemberToProject(member.id, e.target.value, member.name);
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="" disabled>+ Assign / Change Project...</option>
+                    {state.projects.map(proj => (
+                      <option key={proj.id} value={proj.id}>
+                        {(proj.members || []).includes(member.id) ? `✓ ${proj.name} (Assigned)` : `+ ${proj.name}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="team-card-stats">
                 <div className="team-stat">
                   <span className="team-stat-value">{tasks.open}</span>
@@ -340,6 +472,7 @@ export default function Team() {
                   <span className="team-stat-label">Completed</span>
                 </div>
               </div>
+
               <div className="team-card-actions">
                 <button
                   className="btn btn-sm btn-ghost"
@@ -348,12 +481,19 @@ export default function Team() {
                     if (triggerToast) triggerToast('Chat Opened 💬', `Direct message channel ready with ${member.name}`, 'info');
                   }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  Message
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Chat
                 </button>
                 <button className="btn btn-sm btn-primary" onClick={() => setSelectedMember(member)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                   Profile
+                </button>
+                <button
+                  className="btn btn-sm btn-danger-icon"
+                  onClick={() => setMemberToDelete(member)}
+                  title={`Delete ${member.name}`}
+                >
+                  🗑️
                 </button>
               </div>
             </div>
@@ -457,7 +597,65 @@ export default function Team() {
                 </div>
 
                 <div className="form-group">
+                  <div className="field-label-with-action">
+                    <label>Department</label>
+                    <button
+                      type="button"
+                      className="btn-inline-add-field"
+                      onClick={() => setShowAddDept(!showAddDept)}
+                    >
+                      {showAddDept ? 'Cancel' : '+ New Entry'}
+                    </button>
+                  </div>
+                  {showAddDept ? (
+                    <div className="inline-add-input-box">
+                      <input
+                        type="text"
+                        placeholder="Department name..."
+                        value={newDeptName}
+                        onChange={e => setNewDeptName(e.target.value)}
+                        className="modern-text-input small"
+                        autoFocus
+                      />
+                      <button type="button" className="btn-save-inline-field" onClick={handleAddNewDept}>Add</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={inviteForm.department}
+                      onChange={e => setInviteForm({ ...inviteForm, department: e.target.value })}
+                    >
+                      {(state.departments || ['Engineering', 'Design', 'Product', 'Marketing', 'Mobile', 'Security', 'Operations', 'General']).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <div className="field-label-with-action">
                   <label>Assign to Project</label>
+                  <button
+                    type="button"
+                    className="btn-inline-add-field"
+                    onClick={() => setShowAddProj(!showAddProj)}
+                  >
+                    {showAddProj ? 'Cancel' : '+ New Entry'}
+                  </button>
+                </div>
+                {showAddProj ? (
+                  <div className="inline-add-input-box">
+                    <input
+                      type="text"
+                      placeholder="Project name..."
+                      value={newProjName}
+                      onChange={e => setNewProjName(e.target.value)}
+                      className="modern-text-input small"
+                      autoFocus
+                    />
+                    <button type="button" className="btn-save-inline-field" onClick={handleAddNewProj}>Add</button>
+                  </div>
+                ) : (
                   <select
                     value={inviteForm.project}
                     onChange={e => setInviteForm({ ...inviteForm, project: e.target.value })}
@@ -467,7 +665,7 @@ export default function Team() {
                     ))}
                     <option value="All Projects">All Projects (Organization Wide)</option>
                   </select>
-                </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -522,6 +720,56 @@ export default function Team() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     Assign Task
                   </button>
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={() => setMemberToDelete(selectedMember)}
+                    title="Delete member from workspace"
+                  >
+                    🗑️ Delete Member
+                  </button>
+                </div>
+              </div>
+
+              {/* Assigned Projects in Profile */}
+              <div className="profile-projects-section">
+                <h4>Assigned Projects ({state.projects.filter(p => (p.members || []).includes(selectedMember.id)).length})</h4>
+                <div className="profile-projects-list">
+                  {state.projects.filter(p => (p.members || []).includes(selectedMember.id)).length === 0 ? (
+                    <p className="empty-text">No active project assignments.</p>
+                  ) : (
+                    state.projects.filter(p => (p.members || []).includes(selectedMember.id)).map(p => (
+                      <div key={p.id} className="profile-project-badge-item" style={{ '--proj-color': p.color || '#4f46e5' }}>
+                        <span className="proj-dot" />
+                        <span className="proj-title">{p.name}</span>
+                        <button
+                          type="button"
+                          className="btn-remove-badge"
+                          onClick={() => handleRemoveMemberFromProject(selectedMember.id, p.id, selectedMember.name, p.name)}
+                          title={`Remove from ${p.name}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="profile-assign-project-row">
+                  <select
+                    className="select-profile-project"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      handleAddMemberToProject(selectedMember.id, e.target.value, selectedMember.name);
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="" disabled>+ Assign to Project...</option>
+                    {state.projects.map(proj => (
+                      <option key={proj.id} value={proj.id}>
+                        {(proj.members || []).includes(selectedMember.id) ? `✓ ${proj.name} (Assigned)` : `+ ${proj.name}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -600,6 +848,25 @@ export default function Team() {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE MEMBER CONFIRMATION MODAL */}
+      {memberToDelete && (
+        <div className="modal-overlay" onClick={() => setMemberToDelete(null)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="danger-modal-icon-badge" style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '8px' }}>
+              🗑️
+            </div>
+            <h2 style={{ textAlign: 'center' }}>Delete Team Member?</h2>
+            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              Are you sure you want to remove <strong>"{memberToDelete.name}"</strong> from this workspace? They will be unassigned from all active projects and tasks.
+            </p>
+            <div className="modal-actions" style={{ justifyContent: 'center', marginTop: '16px' }}>
+              <button className="btn btn-ghost" onClick={() => setMemberToDelete(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDeleteMember}>Delete Member</button>
             </div>
           </div>
         </div>

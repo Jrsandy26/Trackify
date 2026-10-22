@@ -10592,4 +10592,472 @@ body {
   font-weight: 600;
 }
 
+/* ==========================================================================
+   DYNAMIC ENTRY ADDERS, PROJECT/TASK EDIT & DELETE, AND ASSIGNMENTS
+   ========================================================================== */
+
+/* Field label with inline action button */
+.field-label-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.field-label-with-action label,
+.field-label-with-action .field-label {
+  margin-bottom: 0 !important;
+}
+
+.btn-inline-add-field {
+  background: transparent;
+  border: none;
+  color: var(--primary, #6366f1);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-inline-add-field:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+
+.inline-add-input-box {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inline-add-input-box input {
+  flex: 1;
+  padding: 6px 10px !important;
+  font-size: 0.82rem !important;
+}
+
+.btn-save-inline-field {
+  background: var(--primary, #6366f1);
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.btn-save-inline-field:hover {
+  filter: brightness(1.1);
+}
+
+.inline-add-lead-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lead-inputs-row {
+  display: flex;
+  gap: 6px;
+}
+
+.lead-inputs-row input {
+  flex: 1;
+  padding: 6px 10px !important;
+  font-size: 0.82rem !important;
+}
+
+/* Card Quick Actions (Edit / Delete) on Project Cards */
+.card-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.card-quick-btn {
+  background: var(--bg-hover, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  color: var(--text-muted, #64748b);
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.card-quick-btn:hover.edit {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.card-quick-btn:hover.delete {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Table Row Actions Cluster */
+.table-actions-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-table-icon-edit,
+.btn-table-icon-delete {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  color: var(--text-muted, #64748b);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s ease;
+}
+
+.btn-table-icon-edit:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.btn-table-icon-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Drawer Header Action Buttons */
+.drawer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn-drawer-header-action {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  transition: all 0.15s ease;
+}
+
+.btn-drawer-header-action.edit:hover {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.btn-drawer-header-action.delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-drawer-task-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  margin-left: 6px;
+}
+
+.btn-drawer-task-delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Danger Modal / Confirmation */
+.danger-modal {
+  text-align: center;
+  max-width: 440px !important;
+}
+
+.danger-modal-icon-badge {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+.danger-modal h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.danger-modal p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.danger-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn-danger-confirm {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-danger-confirm:hover {
+  background: #dc2626;
+}
+
+/* Kanban Card Top Right Actions & Stage Buttons */
+.card-top-right-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.card-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.btn-card-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.76rem;
+  transition: all 0.15s ease;
+}
+
+.btn-card-icon.edit:hover {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
+
+.btn-card-icon.delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+/* Team Card Assigned Projects Section */
+.team-card-projects-section {
+  padding: 10px 14px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.02));
+  border-top: 1px solid var(--border, #f1f5f9);
+  border-bottom: 1px solid var(--border, #f1f5f9);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.projects-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mini-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #64748b);
+}
+
+.member-project-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.no-projects-hint {
+  font-size: 0.76rem;
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+}
+
+.member-proj-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.member-proj-tag .tag-proj-name {
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-remove-proj-tag {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-proj-tag:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.assign-project-dropdown-row {
+  width: 100%;
+}
+
+.select-assign-project {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  border-radius: 6px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg-card, #ffffff);
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+
+.btn-sm.btn-danger-icon {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+
+.btn-sm.btn-danger-icon:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+}
+
+/* Profile Modal Assigned Projects */
+.profile-projects-section {
+  margin: 16px 0;
+  padding: 14px 18px;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+}
+
+.profile-projects-section h4 {
+  margin: 0 0 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-projects-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.profile-project-badge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.profile-project-badge-item .proj-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--proj-color, #4f46e5);
+}
+
+.btn-remove-badge {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-badge:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.select-profile-project {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+}
+
 
