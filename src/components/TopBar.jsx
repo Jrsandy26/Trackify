@@ -34,9 +34,9 @@ export default function TopBar() {
   }, []);
 
   const user = state.currentUser || {
-    name: 'Sandeep Sai',
-    email: 'sandeep@trackify.com',
-    initials: 'S',
+    name: 'User',
+    email: '',
+    initials: 'U',
     color: '#3b82f6'
   };
 
@@ -174,10 +174,10 @@ export default function TopBar() {
         <button
           className="topbar-user-avatar-btn"
           onClick={() => navigate('/settings')}
-          title={`${user.name || 'Sandeep Sai'} - Profile & Settings`}
+          title={`${user.name || 'User'} - Profile & Settings`}
         >
           <div className="user-avatar-fernly" style={{ background: user.color || '#3b82f6' }}>
-            {user.initials || 'S'}
+            {user.initials || 'U'}
           </div>
         </button>
       </div>

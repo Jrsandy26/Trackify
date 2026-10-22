@@ -21,9 +21,9 @@ export default function Sidebar() {
   };
 
   const currentUser = state.currentUser || {
-    name: 'Sandeep Sai',
-    email: 'sandeep@trackify.com',
-    initials: 'S',
+    name: 'User',
+    email: '',
+    initials: 'U',
     color: '#3b82f6'
   };
 
@@ -78,12 +78,12 @@ export default function Sidebar() {
           title={isCollapsed ? `${currentUser.name} - Settings` : 'Click to view options'}
         >
           <div className="user-avatar-circle" style={{ background: currentUser.color || '#3b82f6' }}>
-            {currentUser.initials || 'S'}
+            {currentUser.initials || 'U'}
           </div>
           {!isCollapsed && (
             <div className="user-info-text">
-              <span className="user-full-name">{currentUser.name || 'Sandeep Sai'}</span>
-              <span className="user-sub-email">{currentUser.email || 'sandeep@trackify.com'}</span>
+              <span className="user-full-name">{currentUser.name || 'User'}</span>
+              <span className="user-sub-email">{currentUser.email || ''}</span>
             </div>
           )}
           {!isCollapsed && (

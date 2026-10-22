@@ -25,43 +25,33 @@ const getFromStorage = (key, fallback) => {
 };
 
 const getStoredUser = () => {
-  const u = getFromStorage('trackify_user', null);
-  if (!u || u.name === 'Alex Johnson' || u.name === 'Noah Castell') {
-    return initialUsers[0];
-  }
-  return u;
+  return getFromStorage('trackify_user', null);
 };
 
 const getStoredProjects = () => {
   const p = getFromStorage('trackify_projects', null);
-  if (!p || p.length > 20 || !p.some(item => item.name === 'Website Redesign')) {
-    return initialProjects;
-  }
-  return p;
+  return Array.isArray(p) ? p : [];
 };
 
 const getStoredTasks = () => {
   const t = getFromStorage('trackify_tasks', null);
-  if (!t || !t.some(item => item.id === 't_api')) {
-    return initialTasks;
-  }
-  return t;
+  return Array.isArray(t) ? t : [];
 };
 
 const initialCategories = ['Engineering', 'Design', 'Mobile', 'Security', 'Marketing', 'Product', 'Operations'];
 const initialDepartments = ['Engineering', 'Design', 'Product', 'Marketing', 'Mobile', 'Security', 'Operations', 'General'];
 
 const initialState = {
-  isAuthenticated: getFromStorage('trackify_auth', true),
+  isAuthenticated: getFromStorage('trackify_auth', false),
   currentUser: getStoredUser(),
-  users: getFromStorage('trackify_users', initialUsers),
+  users: getFromStorage('trackify_users', []),
   projects: getStoredProjects(),
   tasks: getStoredTasks(),
-  todos: getFromStorage('trackify_todos', initialTodos),
+  todos: getFromStorage('trackify_todos', []),
   categories: getFromStorage('trackify_categories', initialCategories),
   departments: getFromStorage('trackify_departments', initialDepartments),
-  notifications: getFromStorage('trackify_notifications', initialNotifications),
-  reminders: getFromStorage('trackify_reminders', initialReminders),
+  notifications: getFromStorage('trackify_notifications', []),
+  reminders: getFromStorage('trackify_reminders', []),
   settings: getFromStorage('trackify_settings', {
     theme: 'light',
     accent: '#6366f1',
@@ -90,8 +80,25 @@ function appReducer(state, action) {
     }
     case 'LOGIN':
       return { ...state, isAuthenticated: true, currentUser: action.payload };
-    case 'LOGOUT':
-      return { ...state, isAuthenticated: false, currentUser: null };
+    case 'LOGOUT': {
+      localStorage.removeItem('trackify_auth');
+      localStorage.removeItem('trackify_user');
+      localStorage.removeItem('trackify_projects');
+      localStorage.removeItem('trackify_tasks');
+      localStorage.removeItem('trackify_todos');
+      localStorage.removeItem('trackify_notifications');
+      localStorage.removeItem('trackify_reminders');
+      return {
+        ...state,
+        isAuthenticated: false,
+        currentUser: null,
+        projects: [],
+        tasks: [],
+        todos: [],
+        notifications: [],
+        reminders: []
+      };
+    }
     case 'ADD_TOAST':
       return { ...state, toasts: [...state.toasts, action.payload] };
     case 'UPSERT_TOAST': {
@@ -112,9 +119,12 @@ function appReducer(state, action) {
       const newUser = action.payload;
       return {
         ...state,
-        users: [...state.users, newUser],
+        users: [...state.users.filter(u => u.email !== newUser.email), newUser],
         isAuthenticated: true,
-        currentUser: newUser
+        currentUser: newUser,
+        projects: [],
+        tasks: [],
+        todos: []
       };
     }
     case 'TOGGLE_SIDEBAR':

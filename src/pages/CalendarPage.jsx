@@ -49,66 +49,9 @@ export function normalizeDate(raw) {
   return '';
 }
 
-// Seed events meticulously matching the user's reference mockup for October 2026
-const INITIAL_REFERENCE_EVENTS = [
-  { id: 'ref-1', date: '2026-10-01', time: '10:00 AM', title: 'API Integration', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-2', date: '2026-10-01', time: '03:00 PM', title: 'Security Audit', category: 'personal', project: 'Mobile App v2.0', type: 'team_tasks' },
-  { id: 'ref-3', date: '2026-10-02', time: '11:00 AM', title: 'Design System', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-4', date: '2026-10-03', time: '02:00 PM', title: 'Family Time', category: 'personal', project: 'General', type: 'my_tasks' },
-  { id: 'ref-5', date: '2026-10-04', time: '09:00 AM', title: 'Plan Q4 Campaign', category: 'milestone', project: 'Marketing Campaign', type: 'milestones' },
-  { id: 'ref-6', date: '2026-10-05', time: '10:00 AM', title: 'Mobile App UI', category: 'task', project: 'Mobile App v2.0', type: 'my_tasks' },
-  { id: 'ref-7', date: '2026-10-05', time: '04:00 PM', title: 'Project Sync', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-8', date: '2026-10-06', time: '11:00 AM', title: 'Requirements Review', category: 'task', project: 'Passkey Sign In', type: 'my_tasks' },
-  { id: 'ref-9', date: '2026-10-07', time: '02:00 PM', title: 'Client Meeting', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-10', date: '2026-10-08', time: '09:00 AM', title: 'Create Marketing Assets', category: 'task', project: 'Marketing Campaign', type: 'my_tasks' },
-  { id: 'ref-11', date: '2026-10-08', time: '02:00 PM', title: 'Budget Discussion', category: 'personal', project: 'General', type: 'team_tasks' },
-  { id: 'ref-12', date: '2026-10-09', time: '10:00 AM', title: 'Code Implementation', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-13', date: '2026-10-09', time: '04:00 PM', title: 'Sprint Planning', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-14', date: '2026-10-10', time: '11:00 AM', title: 'Marketing Campaign', category: 'milestone', project: 'Marketing Campaign', type: 'milestones' },
-  { id: 'ref-15', date: '2026-10-12', time: '02:00 PM', title: 'Team Sync', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-16', date: '2026-10-13', time: '01:00 PM', title: 'DB Optimization', category: 'task', project: 'Trackify App', type: 'my_tasks' },
-  { id: 'ref-17', date: '2026-10-13', time: '04:00 PM', title: 'Design Review', category: 'milestone', project: 'Mobile App v2.0', type: 'milestones' },
-  { id: 'ref-18', date: '2026-10-14', time: '09:00 AM', title: 'API Integration', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-19', date: '2026-10-15', time: '10:00 AM', title: 'User Testing', category: 'personal', project: 'Website Redesign', type: 'team_tasks' },
-  { id: 'ref-20', date: '2026-10-15', time: '03:00 PM', title: 'Stakeholder Call', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-21', date: '2026-10-16', time: '11:00 AM', title: 'Feature Planning', category: 'task', project: 'Mobile App v2.0', type: 'my_tasks' },
-  { id: 'ref-22', date: '2026-10-18', time: '10:00 AM', title: 'Cache & SQL Review', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-23', date: '2026-10-19', time: '09:00 AM', title: 'Deploy Staging', category: 'personal', project: 'Mobile App v2.0', type: 'team_tasks' },
-  { id: 'ref-24', date: '2026-10-19', time: '03:00 PM', title: 'Release Planning', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-25', date: '2026-10-20', time: '10:00 AM', title: 'UI Improvements', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-26', date: '2026-10-20', time: '02:00 PM', title: 'Design Homepage', category: 'milestone', project: 'Website Redesign', type: 'milestones' },
-  { id: 'ref-27', date: '2026-10-21', time: '11:00 AM', title: 'Validate Outcome', category: 'personal', project: 'Passkey Sign In', type: 'team_tasks' },
-  // TODAY: Oct 22, 2026
-  { id: 'ref-28', date: '2026-10-22', time: '10:00 AM', title: 'Adding feature to dashboard', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-29', date: '2026-10-22', time: '02:00 PM', title: 'Team Sync Meeting', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-30', date: '2026-10-22', time: '04:30 PM', title: 'Design Review', category: 'milestone', project: 'Mobile App v2.0', type: 'milestones' },
-  { id: 'ref-30b', date: '2026-10-22', time: '05:30 PM', title: 'Sprint Retrospective', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-30c', date: '2026-10-22', time: '06:00 PM', title: 'Push Production Hotfix', category: 'task', project: 'Trackify App', type: 'my_tasks' },
-  // TOMORROW: Oct 23, 2026
-  { id: 'ref-31', date: '2026-10-23', time: '09:00 AM', title: 'Testing & Bug Fixes', category: 'personal', project: 'Passkey Sign In', type: 'team_tasks' },
-  { id: 'ref-32', date: '2026-10-23', time: '11:00 AM', title: 'Prepare Slides', category: 'task', project: 'Marketing Campaign', type: 'my_tasks' },
-  { id: 'ref-33', date: '2026-10-23', time: '03:00 PM', title: 'Sprint Planning', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-33b', date: '2026-10-23', time: '05:00 PM', title: 'Code Review', category: 'milestone', project: 'Mobile App v2.0', type: 'milestones' },
-  // Later in October
-  { id: 'ref-34', date: '2026-10-24', time: '10:00 AM', title: 'Code Review', category: 'deadline', project: 'Mobile App v2.0', type: 'team_tasks' },
-  { id: 'ref-35', date: '2026-10-24', time: '02:00 PM', title: 'Design Review', category: 'milestone', project: 'Mobile App v2.0', type: 'milestones' },
-  { id: 'ref-36', date: '2026-10-25', time: '09:00 AM', title: 'Setup CI/CD', category: 'task', project: 'Passkey Sign In', type: 'my_tasks' },
-  { id: 'ref-37', date: '2026-10-25', time: '01:00 PM', title: 'Review Figma', category: 'milestone', project: 'Website Redesign', type: 'milestones' },
-  { id: 'ref-38', date: '2026-10-25', time: '04:00 PM', title: 'Deploy v2.0', category: 'personal', project: 'Mobile App v2.0', type: 'team_tasks' },
-  { id: 'ref-39', date: '2026-10-26', time: '10:00 AM', title: 'Mobile Responsiveness', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-40', date: '2026-10-27', time: '11:00 AM', title: 'Security Vulnerability Patch', category: 'deadline', project: 'Passkey Sign In', type: 'team_tasks' },
-  { id: 'ref-41', date: '2026-10-28', time: '10:00 AM', title: 'Implement Passkey', category: 'task', project: 'Passkey Sign In', type: 'my_tasks' },
-  { id: 'ref-42', date: '2026-10-28', time: '03:00 PM', title: 'Marketing Assets', category: 'personal', project: 'Marketing Campaign', type: 'team_tasks' },
-  { id: 'ref-43', date: '2026-10-29', time: '11:00 AM', title: 'Design System Update', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-44', date: '2026-10-30', time: '10:00 AM', title: 'Write API Docs', category: 'task', project: 'Trackify App', type: 'my_tasks' },
-  { id: 'ref-45', date: '2026-10-30', time: '02:00 PM', title: 'Integration Testing', category: 'personal', project: 'Website Redesign', type: 'team_tasks' },
-  { id: 'ref-46', date: '2026-10-31', time: '11:00 AM', title: 'User Onboarding', category: 'personal', project: 'Passkey Sign In', type: 'team_tasks' },
-  // Trailing next month
-  { id: 'ref-47', date: '2026-11-01', time: '10:00 AM', title: 'Performance Optimization', category: 'task', project: 'Website Redesign', type: 'my_tasks' },
-  { id: 'ref-48', date: '2026-11-04', time: '02:00 PM', title: 'Project Retrospective', category: 'meeting', project: 'General', type: 'meetings' },
-  { id: 'ref-49', date: '2026-11-05', time: '10:00 AM', title: 'Setup Monitoring', category: 'task', project: 'Trackify App', type: 'my_tasks' },
-  { id: 'ref-50', date: '2026-11-05', time: '03:00 PM', title: 'Security Audit', category: 'milestone', project: 'Website Redesign', type: 'milestones' }
-];
+// Real calendar events derived strictly from user's tasks, projects, reminders, and custom events
+const INITIAL_REFERENCE_EVENTS = [];
+
 
 export default function CalendarPage() {
   const { state, dispatch, triggerToast } = useApp();
@@ -161,24 +104,46 @@ export default function CalendarPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // Consolidate events from reference, AppContext state (tasks, todos, reminders, projects) & custom events
+  // Consolidate events from AppContext state (tasks, todos, reminders, projects) & custom events
   const allEvents = useMemo(() => {
-    const list = [...INITIAL_REFERENCE_EVENTS, ...customEvents];
+    const list = [...customEvents];
+
+    const curId = state.currentUser?.id;
+    const curName = state.currentUser?.name;
+    const curEmail = state.currentUser?.email;
+
+    // Accessible projects
+    const userAccessibleProjects = (state.projects || []).filter(p =>
+      (curId && (p.createdBy === curId || p.leadId === curId)) ||
+      (curEmail && (p.createdBy === curEmail || p.lead === curEmail)) ||
+      (curName && p.lead === curName) ||
+      (Array.isArray(p.members) && ((curId && p.members.includes(curId)) || (curEmail && p.members.includes(curEmail))))
+    );
+    const userProjIds = new Set(userAccessibleProjects.map(p => p.id));
+    const userProjNames = new Set(userAccessibleProjects.map(p => p.name?.toLowerCase()));
 
     // Merge in tasks from AppContext
     (state.tasks || []).forEach(t => {
+      const isAssigned = (curId && (t.assignee === curId || t.assigneeId === curId || t.createdBy === curId)) ||
+                         (curEmail && (t.assignee === curEmail || t.createdBy === curEmail)) ||
+                         (curName && t.assignee === curName);
+      const isProjectTask = (t.project && (userProjIds.has(t.project) || userProjNames.has(t.project?.toLowerCase()))) ||
+                            (t.projectId && userProjIds.has(t.projectId));
+
+      if (!isAssigned && !isProjectTask) return;
+
       const d = normalizeDate(t.dueDate);
       if (d) {
-        // Prevent duplicate with reference seed
         if (!list.some(e => e.title.toLowerCase() === t.title.toLowerCase() && e.date === d)) {
-          const isMe = t.assignee === (state.currentUser?.id || 'u0');
+          const isMe = isAssigned;
+          const projName = userAccessibleProjects.find(p => p.id === t.project || p.id === t.projectId)?.name || t.projectName || 'My Task';
           list.push({
             id: t.id,
             date: d,
             time: '11:00 AM',
             title: t.title,
             category: t.priority === 'urgent' ? 'deadline' : 'task',
-            project: state.projects.find(p => p.id === t.project)?.name || 'Trackify',
+            project: projName,
             type: isMe ? 'my_tasks' : 'team_tasks',
             raw: t
           });
@@ -206,7 +171,7 @@ export default function CalendarPage() {
     });
 
     // Merge in projects from AppContext
-    (state.projects || []).forEach(p => {
+    userAccessibleProjects.forEach(p => {
       const d = normalizeDate(p.dueDate);
       if (d) {
         if (!list.some(e => e.title.toLowerCase() === p.name.toLowerCase() && e.date === d)) {

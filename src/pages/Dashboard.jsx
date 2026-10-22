@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { saveSupabaseProject } from '../lib/supabaseClient';
 import { initialCollaborators, initialMilestones } from '../data/mockData';
 
 const PROJECT_THEMES = [
@@ -174,37 +175,58 @@ export default function Dashboard() {
     if (triggerToast) triggerToast('Timer Reset ↺', 'Stopwatch reset back to 00:00:00.', 'info');
   };
 
+  // Scope projects to current user: only projects they lead, created, or have joined as members
+  const curUserId = state.currentUser?.id;
+  const curUserName = state.currentUser?.name;
+  const curUserEmail = state.currentUser?.email;
+
+  const userProjects = (state.projects || []).filter(p =>
+    (curUserId && (p.leadId === curUserId || p.createdBy === curUserId)) ||
+    (curUserName && p.lead === curUserName) ||
+    (Array.isArray(p.members) && (
+      (curUserId && p.members.includes(curUserId)) ||
+      (curUserEmail && p.members.includes(curUserEmail))
+    ))
+  );
+
   const handleProjectSelectChange = (projectId) => {
     setSelectedTrackerProject(projectId);
-    const projName = (state.projects || []).find(p => p.id === projectId)?.name || 'Project';
+    const projName = (userProjects || []).find(p => p.id === projectId)?.name || 'Project';
     if (triggerToast) triggerToast('Tracking Project Changed', `Now tracking time for "${projName}".`, 'info');
   };
 
+
+  const userProjectIds = new Set(userProjects.map(p => p.id));
+  const userProjectNames = new Set(userProjects.map(p => p.name?.toLowerCase()));
+
+  const userTasks = (state.tasks || []).filter(t =>
+    (t.projectId && userProjectIds.has(t.projectId)) ||
+    (t.project && userProjectNames.has(t.project.toLowerCase())) ||
+    (curUserId && (t.assigneeId === curUserId || t.assignee === curUserId || t.createdBy === curUserId)) ||
+    (curUserName && t.assignee === curUserName) ||
+    (curUserEmail && t.assigneeEmail === curUserEmail)
+  );
+
   // Metrics
-  const totalProjects = state.projects?.length || 9;
-  const completedProjects = state.projects?.filter(p => p.status === 'ended' || p.progress === 100)?.length || 2;
-  const runningProjects = state.projects?.filter(p => p.status === 'running' && p.progress < 100)?.length || 5;
-  const pendingProjects = state.projects?.filter(p => p.status === 'pending')?.length || 2;
+  const totalProjects = userProjects.length;
+  const completedProjects = userProjects.filter(p => p.status === 'ended' || p.progress === 100).length;
+  const runningProjects = userProjects.filter(p => p.status === 'running' && (p.progress || 0) < 100).length;
+  const pendingProjects = userProjects.filter(p => p.status === 'pending').length;
 
   // Live project progress & task distribution metrics
-  const totalTasksCount = state.tasks?.length || 39;
-  const completedTasksCount = state.tasks?.filter(t => t.status === 'done' || t.progress === 100)?.length || 12;
-  const inProgressTasksCount = state.tasks?.filter(t => t.status === 'inprogress' || (t.progress > 0 && t.progress < 100))?.length || 16;
-  const inReviewTasksCount = state.tasks?.filter(t => t.status === 'inreview')?.length || 4;
-  const todoTasksCount = state.tasks?.filter(t => t.status === 'todo' && (!t.progress || t.progress === 0))?.length || 7;
+  const totalTasksCount = userTasks.length;
+  const completedTasksCount = userTasks.filter(t => t.status === 'done' || t.progress === 100).length;
+  const inProgressTasksCount = userTasks.filter(t => t.status === 'inprogress' || (t.progress > 0 && t.progress < 100)).length;
+  const inReviewTasksCount = userTasks.filter(t => t.status === 'inreview').length;
+  const todoTasksCount = userTasks.filter(t => t.status === 'todo' && (!t.progress || t.progress === 0)).length;
 
-  const activeProjectsList = state.projects || [];
+  const activeProjectsList = userProjects;
   const overallAvgProgress = activeProjectsList.length > 0
     ? Math.round(activeProjectsList.reduce((sum, p) => sum + (Number(p.progress) || 0), 0) / activeProjectsList.length)
-    : 42;
+    : 0;
 
-  // Top 4 showcase projects for concentric orbital activity rings
-  const topOrbitProjects = [
-    activeProjectsList[0] || { id: 'p1', name: 'Website Redesign', progress: 80, color: '#6366f1', lead: 'Priya Raman', taskCount: '12/15', category: 'Design' },
-    activeProjectsList[1] || { id: 'p3', name: 'Passkey Sign In', progress: 65, color: '#0ea5e9', lead: 'Hana Kobayashi', taskCount: '10/15', category: 'Security' },
-    activeProjectsList[2] || { id: 'p2', name: 'Mobile App v2.0', progress: 50, color: '#10b981', lead: 'Mateo Silva', taskCount: '8/16', category: 'Mobile' },
-    activeProjectsList[3] || { id: 'p4', name: 'API Integration', progress: 45, color: '#f59e0b', lead: 'Alex Johnson', taskCount: '6/12', category: 'API' }
-  ];
+  // Top showcase projects for concentric orbital activity rings
+  const topOrbitProjects = activeProjectsList.slice(0, 4);
 
   const focusedProject = selectedProgressProject === 'all'
     ? null
@@ -233,24 +255,26 @@ export default function Dashboard() {
       id: `p${Date.now()}`,
       name: newProject.name.trim(),
       status: newProject.status || 'running',
-      progress: Number(newProject.progress) || 15,
-      taskCount: '0/1',
+      progress: Number(newProject.progress) || 0,
+      taskCount: '0/0',
       startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       dueDate: formattedDue,
       rawDueDate: newProject.dueDate || '2026-11-20',
-      lead: state.currentUser?.name || 'Sandeep Sai',
-      leadId: state.currentUser?.id || 'u0',
+      lead: state.currentUser?.name || 'Project Lead',
+      leadId: state.currentUser?.id,
+      createdBy: state.currentUser?.id,
       iconType: newProject.iconType || 'stripes',
       color: newProject.color || '#4f46e5',
       category: newProject.category || 'Engineering',
-      description: `${newProject.name} created for ${newProject.category}.`,
-      members: [state.currentUser?.id || 'u0']
+      description: `${newProject.name} project.`,
+      members: [state.currentUser?.id, state.currentUser?.email].filter(Boolean)
     };
 
     dispatch({
       type: 'ADD_PROJECT',
       payload: createdProject
     });
+    saveSupabaseProject(createdProject);
 
     if (triggerToast) {
       triggerToast('Project Created 🎉', `"${newProject.name}" added to Trackify!`, 'success');
@@ -1342,7 +1366,7 @@ export default function Dashboard() {
               value={selectedTrackerProject}
               onChange={e => handleProjectSelectChange(e.target.value)}
             >
-              {(state.projects || []).map(p => (
+              {(userProjects || []).map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
@@ -1743,7 +1767,7 @@ export default function Dashboard() {
               <div className="form-field-group">
                 <label className="field-label">Active Project</label>
                 <div className="project-chip-static">
-                  {(state.projects || []).find(p => p.id === selectedTrackerProject)?.name || 'Project'}
+                  {(userProjects || []).find(p => p.id === selectedTrackerProject)?.name || 'Project'}
                 </div>
               </div>
 

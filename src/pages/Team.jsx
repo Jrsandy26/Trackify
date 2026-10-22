@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { broadcastTeamEvent, syncEventTypes, subscribeTeamEvents } from '../utils/syncChannel';
 
@@ -9,12 +9,47 @@ export default function Team() {
   const [invitations, setInvitations] = useState([]);
   const [inviteResult, setInviteResult] = useState(null);
 
+  // Accessible projects for the current user
+  const userProjects = useMemo(() => {
+    const curId = state.currentUser?.id;
+    const curName = state.currentUser?.name;
+    const curEmail = state.currentUser?.email;
+    if (!curId && !curEmail && !curName) return [];
+    return (state.projects || []).filter(p =>
+      (curId && (p.createdBy === curId || p.leadId === curId)) ||
+      (curEmail && (p.createdBy === curEmail || p.lead === curEmail)) ||
+      (curName && p.lead === curName) ||
+      (Array.isArray(p.members) && ((curId && p.members.includes(curId)) || (curEmail && p.members.includes(curEmail))))
+    );
+  }, [state.projects, state.currentUser]);
+
+  // Active team members: Only the current user + their active project collaborators
+  const activeTeamMembers = useMemo(() => {
+    const curId = state.currentUser?.id;
+    const curEmail = state.currentUser?.email;
+    const collaboratorIds = new Set();
+    if (curId) collaboratorIds.add(curId);
+    if (curEmail) collaboratorIds.add(curEmail);
+    userProjects.forEach(p => {
+      (p.members || []).forEach(m => collaboratorIds.add(m));
+      if (p.leadId) collaboratorIds.add(p.leadId);
+      if (p.createdBy) collaboratorIds.add(p.createdBy);
+    });
+
+    return (state.users || []).filter(u =>
+      (curId && u.id === curId) ||
+      (curEmail && u.email === curEmail) ||
+      collaboratorIds.has(u.id) ||
+      collaboratorIds.has(u.email)
+    );
+  }, [state.users, state.currentUser, userProjects]);
+
   const [inviteForm, setInviteForm] = useState({
     name: '',
     email: '',
     role: 'Senior Developer',
     department: 'Engineering',
-    project: state.projects[0]?.name || 'Website Redesign',
+    project: userProjects[0]?.name || '',
     note: ''
   });
 
@@ -87,9 +122,10 @@ export default function Team() {
       taskCount: '0/1',
       startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       dueDate: 'Nov 30, 2026',
-      lead: state.currentUser?.name || 'Sandeep Sai',
-      leadId: state.currentUser?.id || 'u0',
-      members: [state.currentUser?.id || 'u0'],
+      lead: state.currentUser?.name || 'Owner',
+      leadId: state.currentUser?.id,
+      createdBy: state.currentUser?.id,
+      members: [state.currentUser?.id].filter(Boolean),
       description: `${val} project`,
       color: '#4f46e5',
       iconType: 'stripes',
@@ -145,8 +181,8 @@ export default function Team() {
     setInviteResult(null);
 
     const recipientName = inviteForm.name.trim() || inviteForm.email.split('@')[0];
-    const inviterName = state.currentUser?.name || 'Sandeep Sai';
-    const inviterEmail = state.currentUser?.email || 'sandeep@trackify.com';
+    const inviterName = state.currentUser?.name || 'Team Lead';
+    const inviterEmail = state.currentUser?.email || '';
 
     try {
       const res = await fetch('/api/team/invite', {
@@ -392,14 +428,14 @@ export default function Team() {
 
       {/* SECTION 2: ACTIVE TEAM MEMBERS GRID */}
       <div className="active-team-header-row">
-        <h3>Active Team Members ({state.users.length})</h3>
-        <span className="team-count-subtext">All synced accounts in workspace</span>
+        <h3>Active Team Members ({activeTeamMembers.length})</h3>
+        <span className="team-count-subtext">Collaborators in your workspace & projects</span>
       </div>
 
       <div className="team-grid">
-        {state.users.map(member => {
+        {activeTeamMembers.map(member => {
           const tasks = getMemberTasks(member.id);
-          const memberProjects = (state.projects || []).filter(p => (p.members || []).includes(member.id));
+          const memberProjects = userProjects.filter(p => (p.members || []).includes(member.id));
 
           return (
             <div key={member.id} className="team-card">
@@ -452,7 +488,7 @@ export default function Team() {
                     }}
                   >
                     <option value="" disabled>+ Assign / Change Project...</option>
-                    {state.projects.map(proj => (
+                    {userProjects.map(proj => (
                       <option key={proj.id} value={proj.id}>
                         {(proj.members || []).includes(member.id) ? `✓ ${proj.name} (Assigned)` : `+ ${proj.name}`}
                       </option>
@@ -460,6 +496,7 @@ export default function Team() {
                   </select>
                 </div>
               </div>
+
 
               <div className="team-card-stats">
                 <div className="team-stat">
@@ -661,15 +698,15 @@ export default function Team() {
                     <button type="button" className="btn-save-inline-field" onClick={handleAddNewProj}>Add</button>
                   </div>
                 ) : (
-                  <select
-                    value={inviteForm.project}
-                    onChange={e => setInviteForm({ ...inviteForm, project: e.target.value })}
-                  >
-                    {state.projects.map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                    <option value="All Projects">All Projects (Organization Wide)</option>
-                  </select>
+                    <select
+                      value={inviteForm.project}
+                      onChange={e => setInviteForm({ ...inviteForm, project: e.target.value })}
+                    >
+                      {userProjects.map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                      <option value="All Projects">All Projects (Organization Wide)</option>
+                    </select>
                 )}
               </div>
 
@@ -743,12 +780,12 @@ export default function Team() {
 
               {/* Assigned Projects in Profile */}
               <div className="profile-projects-section">
-                <h4>Assigned Projects ({state.projects.filter(p => (p.members || []).includes(selectedMember.id)).length})</h4>
+                <h4>Assigned Projects ({userProjects.filter(p => (p.members || []).includes(selectedMember.id)).length})</h4>
                 <div className="profile-projects-list">
-                  {state.projects.filter(p => (p.members || []).includes(selectedMember.id)).length === 0 ? (
+                  {userProjects.filter(p => (p.members || []).includes(selectedMember.id)).length === 0 ? (
                     <p className="empty-text">No active project assignments.</p>
                   ) : (
-                    state.projects.filter(p => (p.members || []).includes(selectedMember.id)).map(p => (
+                    userProjects.filter(p => (p.members || []).includes(selectedMember.id)).map(p => (
                       <div key={p.id} className="profile-project-badge-item" style={{ '--proj-color': p.color || '#4f46e5' }}>
                         <span className="proj-dot" />
                         <span className="proj-title">{p.name}</span>
@@ -775,7 +812,7 @@ export default function Team() {
                     }}
                   >
                     <option value="" disabled>+ Assign to Project...</option>
-                    {state.projects.map(proj => (
+                    {userProjects.map(proj => (
                       <option key={proj.id} value={proj.id}>
                         {(proj.members || []).includes(selectedMember.id) ? `✓ ${proj.name} (Assigned)` : `+ ${proj.name}`}
                       </option>

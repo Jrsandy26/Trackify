@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { broadcastTeamEvent, syncEventTypes } from '../utils/syncChannel';
+import { supabase, isSupabaseConfigured, saveSupabaseProject } from '../lib/supabaseClient';
 
 export default function AcceptInvite() {
   const [searchParams] = useSearchParams();
@@ -59,17 +60,32 @@ export default function AcceptInvite() {
       // Log in as this member
       dispatch({ type: 'LOGIN', payload: memberObj });
 
-      // Add to project members in state
-      const targetProj = state.projects.find(p => p.name.toLowerCase() === project.toLowerCase());
-      if (targetProj) {
-        const updatedMembers = [...(targetProj.members || [])];
-        if (!updatedMembers.includes(memberObj.id)) {
-          updatedMembers.push(memberObj.id);
-          dispatch({
-            type: 'UPDATE_PROJECT',
-            payload: { ...targetProj, members: updatedMembers }
-          });
+      // Add to project members in state and Supabase
+      let targetProj = state.projects.find(p => p.name?.toLowerCase() === project.toLowerCase());
+      if (!targetProj && isSupabaseConfigured() && supabase) {
+        try {
+          const { data } = await supabase.from('projects').select('*').ilike('name', project).maybeSingle();
+          if (data) {
+            targetProj = data;
+            dispatch({ type: 'ADD_PROJECT', payload: data });
+          }
+        } catch (dbProjErr) {
+          console.warn('[Supabase] Lookup project on invite accept:', dbProjErr);
         }
+      }
+
+      if (targetProj) {
+        const updatedMembers = Array.from(new Set([
+          ...(targetProj.members || []),
+          memberObj.id,
+          memberObj.email
+        ]));
+        const updatedProj = { ...targetProj, members: updatedMembers };
+        dispatch({
+          type: 'UPDATE_PROJECT',
+          payload: updatedProj
+        });
+        saveSupabaseProject(updatedProj);
       }
 
       // Broadcast event across all open tabs/accounts in real time!

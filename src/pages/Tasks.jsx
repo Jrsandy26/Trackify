@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useApp } from '../context/AppContext';
+import { saveSupabaseTask, deleteSupabaseTask, saveSupabaseProject } from '../lib/supabaseClient';
 
 const columns = [
   { id: 'todo', label: 'To Do', color: '#64748b', icon: '📋' },
@@ -34,11 +35,52 @@ export default function Tasks() {
     title: '', description: '', priority: 'medium', assignee: '', project: '', dueDate: ''
   });
 
+  // Scope accessible projects to the current user
+  const userProjects = useMemo(() => {
+    const curId = state.currentUser?.id;
+    const curName = state.currentUser?.name;
+    const curEmail = state.currentUser?.email;
+    if (!curId && !curEmail && !curName) return [];
+    return (state.projects || []).filter(p =>
+      (curId && (p.createdBy === curId || p.leadId === curId)) ||
+      (curEmail && (p.createdBy === curEmail || p.lead === curEmail)) ||
+      (curName && p.lead === curName) ||
+      (Array.isArray(p.members) && (
+        (curId && p.members.includes(curId)) ||
+        (curEmail && p.members.includes(curEmail))
+      ))
+    );
+  }, [state.projects, state.currentUser]);
+
+  // Scope tasks to user's projects or assigned tasks
+  const userTasks = useMemo(() => {
+    const curId = state.currentUser?.id;
+    const curEmail = state.currentUser?.email;
+    const curName = state.currentUser?.name;
+    const userProjIds = new Set(userProjects.map(p => p.id));
+    const userProjNames = new Set(userProjects.map(p => p.name?.toLowerCase()));
+
+    return (state.tasks || []).filter(t =>
+      (t.project && (userProjIds.has(t.project) || userProjNames.has(t.project?.toLowerCase()))) ||
+      (t.projectId && userProjIds.has(t.projectId)) ||
+      (curId && (t.assignee === curId || t.assigneeId === curId || t.createdBy === curId)) ||
+      (curEmail && (t.assignee === curEmail || t.createdBy === curEmail || t.assigneeEmail === curEmail)) ||
+      (curName && t.assignee === curName)
+    );
+  }, [state.tasks, userProjects, state.currentUser]);
+
   const getFilteredTasks = (status) => {
-    let tasks = state.tasks.filter(t => t.status === status);
+    let tasks = userTasks.filter(t => t.status === status);
 
     if (filter === 'mytask') {
-      tasks = tasks.filter(t => t.assignee === state.currentUser?.id);
+      const curId = state.currentUser?.id;
+      const curEmail = state.currentUser?.email;
+      const curName = state.currentUser?.name;
+      tasks = tasks.filter(t =>
+        (curId && (t.assignee === curId || t.assigneeId === curId)) ||
+        (curEmail && (t.assignee === curEmail || t.assigneeEmail === curEmail)) ||
+        (curName && t.assignee === curName)
+      );
     } else if (filter === 'high') {
       tasks = tasks.filter(t => t.priority === 'high');
     } else if (filter === 'dueweek') {
@@ -129,18 +171,20 @@ export default function Tasks() {
       name: inlineProjectName.trim(),
       status: 'running',
       progress: 0,
-      taskCount: '0/1',
+      taskCount: '0/0',
       startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       dueDate: 'Nov 30, 2026',
-      lead: state.currentUser?.name || 'Sandeep Sai',
-      leadId: state.currentUser?.id || 'u0',
-      members: [state.currentUser?.id || 'u0'],
+      lead: state.currentUser?.name || 'Owner',
+      leadId: state.currentUser?.id,
+      createdBy: state.currentUser?.id,
+      members: [state.currentUser?.id].filter(Boolean),
       description: `${inlineProjectName.trim()} initiative`,
       color: '#6366f1',
       iconType: 'stripes',
       category: 'Engineering'
     };
     dispatch({ type: 'ADD_PROJECT', payload: projObj });
+    saveSupabaseProject(projObj);
     if (isEditing) {
       setEditingTask(prev => ({ ...prev, project: newProjId }));
     } else {
@@ -155,21 +199,24 @@ export default function Tasks() {
   const handleAddTask = (e) => {
     e.preventDefault();
     if (!newTask.title) return;
+    const taskPayload = {
+      id: `t${Date.now()}`,
+      title: newTask.title.trim(),
+      description: newTask.description || '',
+      status: 'todo',
+      priority: newTask.priority || 'medium',
+      assignee: newTask.assignee || state.currentUser?.id,
+      project: newTask.project || (userProjects[0]?.id || ''),
+      createdBy: state.currentUser?.id,
+      dueDate: newTask.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      createdAt: new Date().toISOString().split('T')[0],
+      tags: []
+    };
     dispatch({
       type: 'ADD_TASK',
-      payload: {
-        id: `t${Date.now()}`,
-        title: newTask.title,
-        description: newTask.description,
-        status: 'todo',
-        priority: newTask.priority,
-        assignee: newTask.assignee || state.currentUser?.id,
-        project: newTask.project || state.projects[0]?.id,
-        dueDate: newTask.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-        createdAt: new Date().toISOString().split('T')[0],
-        tags: []
-      }
+      payload: taskPayload
     });
+    saveSupabaseTask(taskPayload);
     if (triggerToast) triggerToast('Task Created 🎉', `"${newTask.title}" added to To Do!`, 'success');
     setNewTask({ title: '', description: '', priority: 'medium', assignee: '', project: '', dueDate: '' });
     setShowNewTask(false);
@@ -179,19 +226,21 @@ export default function Tasks() {
   const handleUpdateTask = (e) => {
     e.preventDefault();
     if (!editingTask || !editingTask.title.trim()) return;
+    const updatedPayload = {
+      id: editingTask.id,
+      title: editingTask.title.trim(),
+      description: editingTask.description || '',
+      status: editingTask.status || 'todo',
+      priority: editingTask.priority || 'medium',
+      assignee: editingTask.assignee,
+      project: editingTask.project,
+      dueDate: editingTask.dueDate
+    };
     dispatch({
       type: 'UPDATE_TASK',
-      payload: {
-        id: editingTask.id,
-        title: editingTask.title.trim(),
-        description: editingTask.description,
-        status: editingTask.status || 'todo',
-        priority: editingTask.priority || 'medium',
-        assignee: editingTask.assignee,
-        project: editingTask.project,
-        dueDate: editingTask.dueDate
-      }
+      payload: updatedPayload
     });
+    saveSupabaseTask(updatedPayload);
     if (triggerToast) triggerToast('Task Updated ✎', `"${editingTask.title}" updated successfully!`, 'success');
     setEditingTask(null);
   };
@@ -199,6 +248,7 @@ export default function Tasks() {
   // Delete Task Handler
   const handleDeleteTask = (taskId, taskTitle) => {
     dispatch({ type: 'DELETE_TASK', payload: taskId });
+    deleteSupabaseTask(taskId);
     if (triggerToast) triggerToast('Task Deleted', `"${taskTitle || 'Task'}" removed.`, 'info');
     if (taskToDelete && taskToDelete.id === taskId) {
       setTaskToDelete(null);
@@ -334,8 +384,8 @@ export default function Tasks() {
                     </div>
                   ) : (
                     <select value={newTask.project} onChange={e => setNewTask({ ...newTask, project: e.target.value })}>
-                      <option value="">Select project</option>
-                      {state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      <option value="">{userProjects.length > 0 ? 'Select project' : 'No projects created yet'}</option>
+                      {userProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   )}
                 </div>
@@ -465,8 +515,8 @@ export default function Tasks() {
                       value={editingTask.project || ''}
                       onChange={e => setEditingTask({ ...editingTask, project: e.target.value })}
                     >
-                      <option value="">Select project</option>
-                      {state.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      <option value="">{userProjects.length > 0 ? 'Select project' : 'No projects created yet'}</option>
+                      {userProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   )}
                 </div>

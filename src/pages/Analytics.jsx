@@ -16,31 +16,42 @@ export default function Analytics() {
   const [hoveredTrendIndex, setHoveredTrendIndex] = useState(null);
 
   const currentUser = state.currentUser || {
-    id: 'usr-1',
-    name: 'Sandeep Sai',
-    email: 'sandeep@trackify.com',
-    role: 'Owner & Lead'
+    id: '',
+    name: 'User',
+    email: '',
+    role: 'Member'
   };
 
   // User's assigned projects
   const myProjects = useMemo(() => {
+    const curId = currentUser.id;
+    const curName = currentUser.name;
+    const curEmail = currentUser.email;
+    if (!curId && !curEmail && !curName) return [];
     return (state.projects || []).filter(p =>
-      (p.members || []).includes(currentUser.id) ||
-      p.lead === currentUser.name ||
-      p.lead === currentUser.email
+      (curId && (p.createdBy === curId || p.leadId === curId)) ||
+      (curEmail && (p.createdBy === curEmail || p.lead === curEmail)) ||
+      (curName && p.lead === curName) ||
+      (Array.isArray(p.members) && ((curId && p.members.includes(curId)) || (curEmail && p.members.includes(curEmail))))
     );
   }, [state.projects, currentUser]);
 
-  const activeProjectsList = projectScope === 'myprojects' ? myProjects : (state.projects || []);
+  const activeProjectsList = myProjects;
 
   // Filter tasks based on scope
   const scopedTasks = useMemo(() => {
-    if (projectScope === 'myprojects') {
-      const myProjectIds = new Set(myProjects.map(p => p.id));
-      return (state.tasks || []).filter(t => myProjectIds.has(t.project) || t.assignee === currentUser.id);
-    }
-    return state.tasks || [];
-  }, [state.tasks, projectScope, myProjects, currentUser]);
+    const myProjectIds = new Set(myProjects.map(p => p.id));
+    const curId = currentUser.id;
+    const curEmail = currentUser.email;
+    const curName = currentUser.name;
+    return (state.tasks || []).filter(t =>
+      myProjectIds.has(t.project) ||
+      myProjectIds.has(t.projectId) ||
+      (curId && (t.assignee === curId || t.assigneeId === curId || t.createdBy === curId)) ||
+      (curEmail && (t.assignee === curEmail || t.createdBy === curEmail)) ||
+      (curName && t.assignee === curName)
+    );
+  }, [state.tasks, myProjects, currentUser]);
 
   // Compute live counts if tasks exist in database
   const liveCompleted = scopedTasks.filter(t => t.status === 'done').length;

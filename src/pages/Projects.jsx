@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { saveSupabaseProject, deleteSupabaseProject } from '../lib/supabaseClient';
 
 const PROJECT_THEMES = [
   { id: 'stripes', label: 'Tech & Core', color: '#4f46e5', bg: '#eef2ff', icon: '///' },
@@ -146,29 +147,48 @@ export default function Projects() {
   const [drawerNewTaskAssignee, setDrawerNewTaskAssignee] = useState('u1');
   const [drawerNewTaskDue, setDrawerNewTaskDue] = useState('2026-11-15');
 
-  // My Projects Count
+  // Projects accessible to the current user (owned, lead, created, or joined as collaborator)
+  const userProjects = useMemo(() => {
+    const curId = state.currentUser?.id;
+    const curName = state.currentUser?.name;
+    const curEmail = state.currentUser?.email;
+    if (!curId && !curEmail && !curName) return [];
+    return (state.projects || []).filter(p =>
+      (curId && (p.createdBy === curId || p.leadId === curId)) ||
+      (curEmail && (p.createdBy === curEmail || p.lead === curEmail)) ||
+      (curName && p.lead === curName) ||
+      (Array.isArray(p.members) && (
+        (curId && p.members.includes(curId)) ||
+        (curEmail && p.members.includes(curEmail))
+      ))
+    );
+  }, [state.projects, state.currentUser]);
+
+  // My Projects Count (Lead or Created by Current User)
   const myProjectsCount = useMemo(() => {
     const curId = state.currentUser?.id;
     const curName = state.currentUser?.name;
-    return (state.projects || []).filter(p =>
+    const curEmail = state.currentUser?.email;
+    return userProjects.filter(p =>
       (curName && p.lead === curName) ||
-      (curId && p.leadId === curId) ||
-      (curId && (p.members || []).includes(curId))
+      (curId && (p.leadId === curId || p.createdBy === curId)) ||
+      (curEmail && p.createdBy === curEmail)
     ).length;
-  }, [state.projects, state.currentUser]);
+  }, [userProjects, state.currentUser]);
 
   // Filtered projects
   const filteredProjects = useMemo(() => {
-    let list = state.projects || [];
+    let list = userProjects;
 
     // Tab filter
     if (activeTab === 'myprojects') {
       const curId = state.currentUser?.id;
       const curName = state.currentUser?.name;
+      const curEmail = state.currentUser?.email;
       list = list.filter(p =>
         (curName && p.lead === curName) ||
-        (curId && p.leadId === curId) ||
-        (curId && (p.members || []).includes(curId))
+        (curId && (p.leadId === curId || p.createdBy === curId)) ||
+        (curEmail && p.createdBy === curEmail)
       );
     } else if (activeTab === 'running') {
       list = list.filter(p => p.status === 'running' && (p.progress || 0) < 100);
@@ -237,7 +257,7 @@ export default function Projects() {
       if (sortBy === 'due') return (a.dueDate || '').localeCompare(b.dueDate || '');
       return 0;
     });
-  }, [state.projects, activeTab, statusFilterChecks, selectedLead, selectedMember, searchTag, dateRange, searchQuery, state.searchQuery, sortBy, state.currentUser]);
+  }, [userProjects, activeTab, statusFilterChecks, selectedLead, selectedMember, searchTag, dateRange, searchQuery, state.searchQuery, sortBy, state.currentUser]);
 
   const clearAllFilters = () => {
     setActiveTab('all');
@@ -309,6 +329,7 @@ export default function Projects() {
   const confirmDeleteProject = () => {
     if (!projectToDelete) return;
     dispatch({ type: 'DELETE_PROJECT', payload: projectToDelete.id });
+    deleteSupabaseProject(projectToDelete.id);
     if (triggerToast) triggerToast('Project Deleted', `"${projectToDelete.name}" and associated tasks removed.`, 'info');
     if (managingProjectId === projectToDelete.id) {
       setManagingProjectId(null);
@@ -335,27 +356,29 @@ export default function Projects() {
     }
 
     const leadUser = state.users.find(u => u.name === editingProject.lead || u.id === editingProject.leadId);
+    const updatedPayload = {
+      ...editingProject,
+      name: editingProject.name.trim(),
+      dueDate: formattedDue,
+      leadId: leadUser ? leadUser.id : editingProject.leadId
+    };
 
     dispatch({
       type: 'UPDATE_PROJECT',
-      payload: {
-        ...editingProject,
-        name: editingProject.name.trim(),
-        dueDate: formattedDue,
-        leadId: leadUser ? leadUser.id : editingProject.leadId
-      }
+      payload: updatedPayload
     });
+    saveSupabaseProject(updatedPayload);
 
     if (triggerToast) triggerToast('Project Updated ✎', `"${editingProject.name}" saved successfully!`, 'success');
     setEditingProject(null);
   };
 
 
-  // Metric counts
-  const totalCount = state.projects?.length || 9;
-  const completedCount = state.projects?.filter(p => p.status === 'ended' || p.progress === 100)?.length || 2;
-  const runningCount = state.projects?.filter(p => p.status === 'running' && p.progress < 100)?.length || 5;
-  const pendingCount = state.projects?.filter(p => p.status === 'pending')?.length || 2;
+  // Metric counts scoped to active user
+  const totalCount = userProjects.length;
+  const completedCount = userProjects.filter(p => p.status === 'ended' || p.progress === 100).length;
+  const runningCount = userProjects.filter(p => p.status === 'running' && (p.progress || 0) < 100).length;
+  const pendingCount = userProjects.filter(p => p.status === 'pending').length;
 
   // Create Project handler
   const handleCreateProject = (e) => {
@@ -375,20 +398,24 @@ export default function Projects() {
       }
     }
 
-    const leadUser = state.users.find(u => u.name === newProject.lead) || state.users[0];
+    const leadUser = state.users.find(u => u.name === newProject.lead) || {
+      id: state.currentUser?.id,
+      name: state.currentUser?.name || 'Owner'
+    };
 
     const projectPayload = {
       id: `p${Date.now()}`,
       name: newProject.name.trim(),
       status: newProject.status || 'running',
-      progress: Number(newProject.progress) || 15,
-      taskCount: '0/1',
+      progress: Number(newProject.progress) || 0,
+      taskCount: '0/0',
       startDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       dueDate: formattedDue,
       rawDueDate: newProject.dueDate || '2026-11-20',
-      lead: newProject.lead || leadUser.name,
-      leadId: leadUser.id,
-      members: [leadUser.id, state.currentUser?.id || 'u0'],
+      lead: newProject.lead || state.currentUser?.name || 'Owner',
+      leadId: leadUser.id || state.currentUser?.id,
+      createdBy: state.currentUser?.id,
+      members: Array.from(new Set([state.currentUser?.id, state.currentUser?.email, leadUser.id].filter(Boolean))),
       description: newProject.description || `${newProject.name} created for team milestones.`,
       color: newProject.color || '#4f46e5',
       iconType: newProject.iconType || 'stripes',
@@ -396,17 +423,18 @@ export default function Projects() {
     };
 
     dispatch({ type: 'ADD_PROJECT', payload: projectPayload });
+    saveSupabaseProject(projectPayload);
     if (triggerToast) triggerToast('Project Created 🎉', `"${newProject.name}" added successfully!`, 'success');
 
     setNewProject({
       name: '',
       category: 'Engineering',
       status: 'running',
-      progress: 15,
+      progress: 0,
       dueDate: '2026-11-20',
       iconType: 'stripes',
       color: '#4f46e5',
-      lead: 'Priya Raman',
+      lead: state.currentUser?.name || 'Owner',
       description: ''
     });
     setShowNewProjectModal(false);
@@ -474,7 +502,7 @@ export default function Projects() {
   }, [state.tasks, managingProject]);
 
   // Lead options for filter
-  const uniqueLeads = Array.from(new Set((state.projects || []).map(p => p.lead).filter(Boolean)));
+  const uniqueLeads = Array.from(new Set(userProjects.map(p => p.lead).filter(Boolean)));
 
   return (
     <div className="projects-page-wrapper">
@@ -721,7 +749,11 @@ export default function Projects() {
                       <div className="footer-meta-left">
                         <span className="meta-task-badge">
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                          {proj.taskCount || '8/12 tasks'}
+                          {(() => {
+                            const pTasks = (state.tasks || []).filter(t => t.project === proj.id || t.projectName === proj.name);
+                            const pDone = pTasks.filter(t => t.status === 'done').length;
+                            return pTasks.length > 0 ? `${pDone}/${pTasks.length} tasks` : (proj.taskCount || '0 tasks');
+                          })()}
                         </span>
                         <span className="meta-due-badge">
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -731,22 +763,22 @@ export default function Projects() {
 
                       {/* Avatars */}
                       <div className="avatar-stack-group">
-                        {(proj.members || ['u1', 'u2', 'u0']).slice(0, 3).map((mId, i) => {
-                          const user = state.users.find(u => u.id === mId) || { initials: 'T', color: '#6366f1' };
+                        {(proj.members || []).slice(0, 3).map((mId, i) => {
+                          const user = state.users.find(u => u.id === mId || u.email === mId) || { initials: 'U', color: '#6366f1' };
                           return (
                             <div
                               key={i}
                               className="stack-avatar"
-                              style={{ background: user.color }}
-                              title={user.name}
+                              style={{ background: user.color || '#6366f1' }}
+                              title={user.name || user.email}
                             >
-                              {user.initials}
+                              {user.initials || 'U'}
                             </div>
                           );
                         })}
-                        {(proj.members?.length || 4) > 3 && (
+                        {(proj.members || []).length > 3 && (
                           <div className="stack-avatar extra">
-                            +{(proj.members?.length || 4) - 2}
+                            +{(proj.members || []).length - 3}
                           </div>
                         )}
                       </div>
@@ -754,6 +786,47 @@ export default function Projects() {
                   </div>
                 );
               })}
+              {filteredProjects.length === 0 && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'center',
+                  padding: '50px 20px',
+                  background: '#ffffff',
+                  borderRadius: '16px',
+                  border: '1.5px dashed #cbd5e1',
+                  margin: '10px 0'
+                }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: '#eff6ff',
+                    color: '#2563eb',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '12px'
+                  }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}>
+                    No projects found
+                  </h3>
+                  <p style={{ color: '#64748b', fontSize: '0.88rem', maxWidth: '380px', margin: '0 auto 18px' }}>
+                    You don't have any projects here yet. Create your own project or collaborate with your team!
+                  </p>
+                  <button
+                    className="btn-new-project-pill"
+                    onClick={() => setShowNewProjectModal(true)}
+                    style={{ margin: '0 auto' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Create Project
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -795,7 +868,10 @@ export default function Projects() {
                       archived: 'archived'
                     }[p.status] || 'running';
 
-                    const leadUser = state.users.find(u => u.name === p.lead || u.id === p.leadId) || { name: p.lead || 'Priya Raman', color: '#f43f5e', initials: 'PR' };
+                    const leadUser = state.users.find(u => u.name === p.lead || u.id === p.leadId || u.email === p.lead) || { name: p.lead || 'Owner', color: '#3b82f6', initials: (p.lead || 'O').slice(0, 2).toUpperCase() };
+                    const pTasks = (state.tasks || []).filter(t => t.project === p.id || t.projectName === p.name);
+                    const pDone = pTasks.filter(t => t.status === 'done').length;
+                    const tableTaskCount = pTasks.length > 0 ? `${pDone}/${pTasks.length}` : (p.taskCount || '0/0');
 
                     return (
                       <tr key={p.id} onClick={() => setManagingProject(p)}>
@@ -823,30 +899,30 @@ export default function Projects() {
                           </div>
                           <span className="table-pct-num">{p.progress || 0}%</span>
                         </td>
-                        <td>{p.taskCount || '8/12'}</td>
-                        <td className="date-muted">{p.startDate || 'Aug 01, 2026'}</td>
-                        <td className="date-muted">{p.dueDate || 'Oct 25, 2026'}</td>
+                        <td>{tableTaskCount}</td>
+                        <td className="date-muted">{p.startDate || 'Just now'}</td>
+                        <td className="date-muted">{p.dueDate || 'Flexible'}</td>
                         <td>
                           <div className="lead-avatar-cell">
-                            <div className="lead-avatar-bubble" style={{ background: leadUser.color }}>
-                              {leadUser.initials}
+                            <div className="lead-avatar-bubble" style={{ background: leadUser.color || '#3b82f6' }}>
+                              {leadUser.initials || 'U'}
                             </div>
-                            <span>{leadUser.name}</span>
+                            <span>{leadUser.name || 'Owner'}</span>
                           </div>
                         </td>
                         <td>
                           <div className="avatar-stack-group small">
-                            {(p.members || ['u1', 'u2', 'u0']).slice(0, 3).map((mId, i) => {
-                              const u = state.users.find(user => user.id === mId) || { initials: 'T', color: '#6366f1' };
+                            {(p.members || []).slice(0, 3).map((mId, i) => {
+                              const u = state.users.find(user => user.id === mId || user.email === mId) || { initials: 'U', color: '#6366f1' };
                               return (
-                                <div key={i} className="stack-avatar" style={{ background: u.color }} title={u.name}>
-                                  {u.initials}
+                                <div key={i} className="stack-avatar" style={{ background: u.color || '#6366f1' }} title={u.name || u.email}>
+                                  {u.initials || 'U'}
                                 </div>
                               );
                             })}
-                            {(p.members?.length || 4) > 3 && (
+                            {(p.members || []).length > 3 && (
                               <div className="stack-avatar extra">
-                                +{(p.members?.length || 4) - 2}
+                                +{(p.members || []).length - 3}
                               </div>
                             )}
                           </div>
@@ -890,6 +966,13 @@ export default function Projects() {
                       </tr>
                     );
                   })}
+                  {filteredProjects.length === 0 && (
+                    <tr>
+                      <td colSpan="10" style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b', fontSize: '0.9rem' }}>
+                        No projects found. Click "New Project" to get started!
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
