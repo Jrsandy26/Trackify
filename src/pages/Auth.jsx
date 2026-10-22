@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { syncUserProfile } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, syncUserProfile } from '../lib/supabaseClient';
 
 export default function Auth() {
   const [authMode, setAuthMode] = useState('password'); // 'password' | 'otp' | 'forgot_password'
@@ -126,7 +126,9 @@ export default function Auth() {
     e.preventDefault();
     setError('');
 
-    if (!email.trim()) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
       setError('Please enter your email address');
       return;
     }
@@ -137,11 +139,40 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const user = state.users.find(
-        u => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
+      // 1. Check local state users
+      let user = state.users.find(
+        u => u.email.toLowerCase() === normalizedEmail && (u.password === password || !u.password)
       );
+
+      // 2. If not found locally, query Supabase profiles
+      if (!user && isSupabaseConfigured() && supabase) {
+        try {
+          const { data, error: dbErr } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', normalizedEmail)
+            .maybeSingle();
+
+          if (data && !dbErr) {
+            user = {
+              id: data.id,
+              name: data.name,
+              email: data.email,
+              password: password,
+              role: data.role || 'Team Member',
+              department: data.department || 'General',
+              color: data.color || '#0284c7',
+              initials: data.initials || data.name?.slice(0, 2).toUpperCase() || 'U'
+            };
+            dispatch({ type: 'SIGNUP', payload: user });
+          }
+        } catch (supabaseLookupErr) {
+          console.warn('[Supabase] Profile lookup on sign-in:', supabaseLookupErr);
+        }
+      }
+
       if (!user) {
-        setError('Invalid email address or password');
+        setError('Invalid email address or password. If you are new, please click "Create Account".');
         setLoading(false);
         return;
       }
@@ -158,6 +189,8 @@ export default function Auth() {
       }
 
       navigate('/');
+    } catch (err) {
+      setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }

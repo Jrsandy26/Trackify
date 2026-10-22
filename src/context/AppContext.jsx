@@ -392,6 +392,7 @@ function appReducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const toastTimeoutsRef = useRef({});
 
   useEffect(() => {
     localStorage.setItem('trackify_auth', JSON.stringify(state.isAuthenticated));
