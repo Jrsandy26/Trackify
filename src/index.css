@@ -4351,13 +4351,14 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  margin-left: 260px;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 0;
+  width: 100%;
+  margin-left: 0 !important;
   background: #edf1f6;
 }
 
 .sidebar-collapsed .main-wrapper {
-  margin-left: 82px;
+  margin-left: 0 !important;
 }
 
 /* Main Content stretching */
@@ -4365,7 +4366,9 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 20px 32px 32px;
+  padding: 16px 28px 36px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Dark Floating Sidebar */
@@ -5728,16 +5731,22 @@ body {
    Matches exact reference images: 4-Row Dashboard + Projects Directory & Drawer
    ========================================================================== */
 
-/* Page Containers */
+/* Page Containers - Full Fluid Width without artificial gap constraints */
 .dashboard-page-container,
-.projects-page-wrapper {
+.projects-page-wrapper,
+.tasks-page,
+.analytics-page,
+.team-page,
+.settings-page,
+.help-page {
   display: flex;
   flex-direction: column;
   gap: 24px;
   width: 100%;
-  max-width: 1560px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   padding-bottom: 40px;
+  box-sizing: border-box;
 }
 
 /* Header Banners */
@@ -8284,9 +8293,10 @@ body {
    REFERENCE CALENDAR UI / UX (PIXEL PERFECT MATCH)
    ===================================================================== */
 .ref-calendar-page-wrapper {
-  padding: 24px 32px 48px;
-  max-width: 1720px;
-  margin: 0 auto;
+  padding: 0 0 40px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   color: var(--text);
   box-sizing: border-box;
 }
