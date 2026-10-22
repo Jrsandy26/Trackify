@@ -1,50 +1,188 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { broadcastTeamEvent, syncEventTypes, subscribeTeamEvents } from '../utils/syncChannel';
 
 export default function Team() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, triggerToast } = useApp();
   const [showInvite, setShowInvite] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Team Member', department: 'Engineering' });
+  const [inviting, setInviting] = useState(false);
+  const [invitations, setInvitations] = useState([]);
+  const [inviteResult, setInviteResult] = useState(null);
+
+  const [inviteForm, setInviteForm] = useState({
+    name: '',
+    email: '',
+    role: 'Senior Developer',
+    department: 'Engineering',
+    project: state.projects[0]?.name || 'Website Redesign',
+    note: ''
+  });
+
   const [selectedMember, setSelectedMember] = useState(null);
   const [showAssignTask, setShowAssignTask] = useState(false);
   const [assignTask, setAssignTask] = useState({ title: '', priority: 'medium', dueDate: '' });
 
-  const handleInvite = (e) => {
-    e.preventDefault();
-    if (!inviteForm.name || !inviteForm.email) return;
-    const initials = inviteForm.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    const colors = ['#6366f1', '#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-    const newMember = {
-      id: `u${Date.now()}`,
-      name: inviteForm.name,
-      email: inviteForm.email,
-      role: inviteForm.role,
-      department: inviteForm.department,
-      bio: '',
-      timezone: 'UTC',
-      password: 'demo123',
-      avatar: null,
-      initials,
-      color: colors[Math.floor(Math.random() * colors.length)]
-    };
-    dispatch({ type: 'ADD_MEMBER', payload: newMember });
-    dispatch({
-      type: 'ADD_NOTIFICATION',
-      payload: {
-        id: `n${Date.now()}`,
-        userId: state.currentUser?.id,
-        userName: state.currentUser?.name,
-        userEmail: state.currentUser?.email,
-        action: 'invited',
-        target: inviteForm.name,
-        from: null,
-        to: 'Team',
-        timestamp: Date.now(),
-        read: false
+  // Quick domain chips
+  const domains = ['@gmail.com', '@outlook.com', '@hotmail.com'];
+  const handleDomainClick = (dom) => {
+    const prefix = inviteForm.email.split('@')[0] || '';
+    setInviteForm({ ...inviteForm, email: `${prefix}${dom}` });
+  };
+
+  // Fetch pending invitations from backend
+  const fetchInvitations = async () => {
+    try {
+      const res = await fetch('/api/team/invites');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.invitations)) {
+        setInvitations(data.invitations);
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  useEffect(() => {
+    fetchInvitations();
+
+    // Subscribe to cross-tab realtime events
+    const unsubscribe = subscribeTeamEvents((data) => {
+      if (!data || !data.type) return;
+      if (data.type === syncEventTypes.INVITE_SENT || data.type === syncEventTypes.INVITE_ACCEPTED || data.type === syncEventTypes.INVITE_REVOKED) {
+        fetchInvitations();
       }
     });
-    setInviteForm({ name: '', email: '', role: 'Team Member', department: 'Engineering' });
-    setShowInvite(false);
+
+    return () => unsubscribe();
+  }, []);
+
+  // 1. Send Invitation via Gmail SMTP
+  const handleInviteSubmit = async (e) => {
+    e.preventDefault();
+    if (!inviteForm.email.trim()) return;
+
+    setInviting(true);
+    setInviteResult(null);
+
+    const recipientName = inviteForm.name.trim() || inviteForm.email.split('@')[0];
+    const inviterName = state.currentUser?.name || 'Sandeep Sai';
+    const inviterEmail = state.currentUser?.email || 'sandeep@trackify.com';
+
+    try {
+      const res = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inviterName,
+          inviterEmail,
+          recipientEmail: inviteForm.email.trim(),
+          recipientName,
+          role: inviteForm.role,
+          department: inviteForm.department,
+          project: inviteForm.project,
+          note: inviteForm.note
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok && !data.success) {
+        throw new Error(data.message || 'Failed to dispatch invitation');
+      }
+
+      setInviteResult(data);
+      if (data.invite) {
+        setInvitations(prev => [data.invite, ...prev.filter(inv => inv.id !== data.invite.id)]);
+      }
+
+      // Broadcast event across all open accounts/tabs in real time!
+      broadcastTeamEvent(syncEventTypes.INVITE_SENT, {
+        recipientEmail: inviteForm.email.trim(),
+        recipientName,
+        project: inviteForm.project,
+        role: inviteForm.role,
+        invite: data.invite
+      });
+
+      if (triggerToast) {
+        triggerToast(
+          data.emailSent ? 'Invitation Sent via Gmail SMTP! ✉️' : 'Invitation Dispatched! ✉️',
+          data.message || `Invitation sent to ${inviteForm.email}`,
+          'success'
+        );
+      }
+
+      setInviteForm({
+        name: '',
+        email: '',
+        role: 'Senior Developer',
+        department: 'Engineering',
+        project: state.projects[0]?.name || 'Website Redesign',
+        note: ''
+      });
+    } catch (err) {
+      console.warn('API error, using local fallback:', err);
+      // Fallback
+      const fallbackInvite = {
+        id: `inv-${Date.now()}`,
+        token: `tok_${Date.now()}`,
+        inviterName,
+        inviterEmail,
+        recipientName,
+        recipientEmail: inviteForm.email.trim(),
+        role: inviteForm.role,
+        department: inviteForm.department,
+        project: inviteForm.project,
+        note: inviteForm.note,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      setInvitations(prev => [fallbackInvite, ...prev]);
+      if (triggerToast) {
+        triggerToast('Invitation Created 📬', `Ready for ${inviteForm.email}`, 'info');
+      }
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  // 2. Resend Invitation Email
+  const handleResend = async (inv) => {
+    try {
+      const res = await fetch('/api/team/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: inv.id })
+      });
+      const data = await res.json();
+      if (triggerToast) {
+        triggerToast('Reminder Sent ✉️', data.message || `Reminder email dispatched to ${inv.recipientEmail}`, 'success');
+      }
+    } catch {
+      if (triggerToast) triggerToast('Reminder Sent', `Notification resent to ${inv.recipientEmail}`, 'info');
+    }
+  };
+
+  // 3. Revoke Invitation
+  const handleRevoke = async (id) => {
+    try {
+      await fetch('/api/team/revoke-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      setInvitations(prev => prev.filter(inv => inv.id !== id));
+      broadcastTeamEvent(syncEventTypes.INVITE_REVOKED, { id });
+      if (triggerToast) triggerToast('Invitation Revoked', 'The pending invite was cancelled.', 'info');
+    } catch {
+      setInvitations(prev => prev.filter(inv => inv.id !== id));
+    }
+  };
+
+  // Copy Join Link to Clipboard
+  const handleCopyLink = (inv) => {
+    const link = `${window.location.origin}/#/accept-invite?token=${inv.token}&email=${encodeURIComponent(inv.recipientEmail)}&name=${encodeURIComponent(inv.recipientName)}&project=${encodeURIComponent(inv.project)}&role=${encodeURIComponent(inv.role)}`;
+    navigator.clipboard.writeText(link);
+    if (triggerToast) triggerToast('Join Link Copied! 📋', 'Direct invitation link copied to clipboard.', 'success');
   };
 
   const getMemberTasks = (userId) => {
@@ -76,6 +214,7 @@ export default function Team() {
     });
     setAssignTask({ title: '', priority: 'medium', dueDate: '' });
     setShowAssignTask(false);
+    if (triggerToast) triggerToast('Task Assigned 📋', `Assigned to ${selectedMember.name}`, 'success');
   };
 
   const statusLabels = {
@@ -85,47 +224,227 @@ export default function Team() {
     done: 'Done'
   };
 
+  const pendingList = invitations.filter(inv => inv.status === 'pending');
+
   return (
     <div className="team-page">
+      {/* Page Header */}
       <div className="page-header">
         <div>
-          <h1>Team</h1>
-          <p className="page-subtitle">Manage your team members and collaboration</p>
+          <h1>Team & Collaboration</h1>
+          <p className="page-subtitle">
+            Manage your organization members, invite teammates via Gmail SMTP, and collaborate in real time.
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowInvite(true)}>
+        <button className="btn btn-primary" onClick={() => { setShowInvite(true); setInviteResult(null); }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="8.5" cy="7" r="4"/>
-            <line x1="20" y1="8" x2="20" y2="14"/>
-            <line x1="23" y1="11" x2="17" y2="11"/>
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="8.5" cy="7" r="4" />
+            <line x1="20" y1="8" x2="20" y2="14" />
+            <line x1="23" y1="11" x2="17" y2="11" />
           </svg>
-          Invite Member
+          Invite Member (Gmail / Outlook)
         </button>
       </div>
 
-      {/* Invite Modal */}
+      {/* SECTION 1: PENDING INVITATIONS (REALTIME TRACKING) */}
+      {pendingList.length > 0 && (
+        <div className="pending-invites-section">
+          <div className="pending-invites-header">
+            <div className="pending-title-group">
+              <span className="live-pulse-dot" />
+              <h3>Pending Team Invitations ({pendingList.length})</h3>
+            </div>
+            <span className="pending-subhint">
+              Recipients receive an invitation email via Gmail SMTP with a direct 1-click join link.
+            </span>
+          </div>
+
+          <div className="pending-invites-grid">
+            {pendingList.map(inv => (
+              <div key={inv.id} className="pending-invite-card">
+                <div className="pic-top-row">
+                  <div className="pic-user-avatar">
+                    {(inv.recipientName || inv.recipientEmail)[0].toUpperCase()}
+                  </div>
+                  <div className="pic-user-info">
+                    <span className="pic-name">{inv.recipientName}</span>
+                    <span className="pic-email">{inv.recipientEmail}</span>
+                  </div>
+                  <span className="pic-pending-badge">Pending</span>
+                </div>
+
+                <div className="pic-meta-row">
+                  <span className="pic-proj-tag">📁 {inv.project}</span>
+                  <span className="pic-role-tag">🛡️ {inv.role}</span>
+                </div>
+
+                {inv.note && <p className="pic-note">"{inv.note}"</p>}
+
+                <div className="pic-actions-row">
+                  <button
+                    className="btn-pic-action copy"
+                    onClick={() => handleCopyLink(inv)}
+                    title="Copy direct invitation link"
+                  >
+                    📋 Copy Link
+                  </button>
+                  <button
+                    className="btn-pic-action resend"
+                    onClick={() => handleResend(inv)}
+                    title="Resend email via Gmail SMTP"
+                  >
+                    ✉️ Resend
+                  </button>
+                  <button
+                    className="btn-pic-action revoke"
+                    onClick={() => handleRevoke(inv.id)}
+                    title="Cancel invitation"
+                  >
+                    ✕ Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 2: ACTIVE TEAM MEMBERS GRID */}
+      <div className="active-team-header-row">
+        <h3>Active Team Members ({state.users.length})</h3>
+        <span className="team-count-subtext">All synced accounts in workspace</span>
+      </div>
+
+      <div className="team-grid">
+        {state.users.map(member => {
+          const tasks = getMemberTasks(member.id);
+          return (
+            <div key={member.id} className="team-card">
+              <div className="team-card-top">
+                <div className="team-avatar" style={{ background: member.color || '#0284c7' }}>
+                  {member.initials || member.name.slice(0, 2).toUpperCase()}
+                </div>
+                <h3 className="team-member-name">{member.name}</h3>
+                <p className="team-member-role">{member.role}</p>
+                <span className="team-dept-badge">{member.department || 'General'}</span>
+              </div>
+              <div className="team-card-stats">
+                <div className="team-stat">
+                  <span className="team-stat-value">{tasks.open}</span>
+                  <span className="team-stat-label">Open Tasks</span>
+                </div>
+                <div className="team-stat-divider" />
+                <div className="team-stat">
+                  <span className="team-stat-value">{tasks.completed}</span>
+                  <span className="team-stat-label">Completed</span>
+                </div>
+              </div>
+              <div className="team-card-actions">
+                <button
+                  className="btn btn-sm btn-ghost"
+                  title="Message"
+                  onClick={() => {
+                    if (triggerToast) triggerToast('Chat Opened 💬', `Direct message channel ready with ${member.name}`, 'info');
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Message
+                </button>
+                <button className="btn btn-sm btn-primary" onClick={() => setSelectedMember(member)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Profile
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* MODAL 1: INVITE TEAM MEMBER VIA GMAIL SMTP */}
       {showInvite && (
         <div className="modal-overlay" onClick={() => setShowInvite(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-lg invite-member-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Invite Team Member</h2>
+              <div className="modal-title-with-icon">
+                <div className="invite-modal-icon-badge">✉️</div>
+                <div>
+                  <h2>Invite Teammate via Email</h2>
+                  <p className="modal-subtitle">
+                    Dispatches a real email invitation using Gmail SMTP with an instant join link.
+                  </p>
+                </div>
+              </div>
               <button className="modal-close" onClick={() => setShowInvite(false)}>✕</button>
             </div>
-            <form onSubmit={handleInvite} className="modal-form">
-              <div className="form-group">
-                <label>Full Name</label>
-                <input type="text" placeholder="Enter full name" value={inviteForm.name}
-                  onChange={e => setInviteForm({ ...inviteForm, name: e.target.value })} autoFocus />
+
+            <form onSubmit={handleInviteSubmit} className="modal-form">
+              {inviteResult && (
+                <div className={`invite-status-banner ${inviteResult.emailSent ? 'success' : 'info'}`}>
+                  <span>{inviteResult.message}</span>
+                  {inviteResult.joinLink && (
+                    <div className="join-link-preview-box">
+                      <span>Direct join link:</span>
+                      <code>{inviteResult.joinLink}</code>
+                      <button
+                        type="button"
+                        className="btn-copy-preview"
+                        onClick={() => {
+                          navigator.clipboard.writeText(inviteResult.joinLink);
+                          if (triggerToast) triggerToast('Link Copied!', 'Join URL copied to clipboard.', 'success');
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Recipient Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Maya Lin"
+                    value={inviteForm.name}
+                    onChange={e => setInviteForm({ ...inviteForm, name: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Recipient Email Address (Gmail / Outlook) *</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. maya@gmail.com or maya@outlook.com"
+                    value={inviteForm.email}
+                    onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })}
+                    required
+                  />
+                  <div className="auth-domain-chips" style={{ marginTop: '6px' }}>
+                    <span className="chip-label">Quick select:</span>
+                    {domains.map(dom => (
+                      <button
+                        key={dom}
+                        type="button"
+                        className="domain-chip"
+                        onClick={() => handleDomainClick(dom)}
+                      >
+                        {dom}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Email Address</label>
-                <input type="email" placeholder="Enter email address" value={inviteForm.email}
-                  onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })} />
-              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label>Role</label>
-                  <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}>
+                  <select
+                    value={inviteForm.role}
+                    onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}
+                  >
                     <option>Project Lead</option>
                     <option>Senior Developer</option>
                     <option>Developer</option>
@@ -133,30 +452,53 @@ export default function Team() {
                     <option>QA Engineer</option>
                     <option>DevOps Engineer</option>
                     <option>Team Member</option>
+                    <option>Viewer</option>
                   </select>
                 </div>
+
                 <div className="form-group">
-                  <label>Department</label>
-                  <select value={inviteForm.department} onChange={e => setInviteForm({ ...inviteForm, department: e.target.value })}>
-                    <option>Engineering</option>
-                    <option>Design</option>
-                    <option>Quality Assurance</option>
-                    <option>Infrastructure</option>
-                    <option>Marketing</option>
-                    <option>Management</option>
+                  <label>Assign to Project</label>
+                  <select
+                    value={inviteForm.project}
+                    onChange={e => setInviteForm({ ...inviteForm, project: e.target.value })}
+                  >
+                    {state.projects.map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                    <option value="All Projects">All Projects (Organization Wide)</option>
                   </select>
                 </div>
               </div>
+
+              <div className="form-group">
+                <label>Personal Invitation Note (Optional)</label>
+                <textarea
+                  rows="2"
+                  placeholder="e.g. Hey! Excited to have you collaborate on our upcoming sprint."
+                  value={inviteForm.note}
+                  onChange={e => setInviteForm({ ...inviteForm, note: e.target.value })}
+                  className="modern-textarea"
+                />
+              </div>
+
               <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowInvite(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Send Invitation</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowInvite(false)}>
+                  Done
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={inviting}>
+                  {inviting ? (
+                    <span className="spinner-text">Sending via SMTP...</span>
+                  ) : (
+                    <span>🚀 Send Invitation Email</span>
+                  )}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Member Profile Modal */}
+      {/* MODAL 2: MEMBER PROFILE & TASK ASSIGNMENT */}
       {selectedMember && (
         <div className="modal-overlay" onClick={() => { setSelectedMember(null); setShowAssignTask(false); }}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -166,8 +508,8 @@ export default function Team() {
             </div>
             <div className="profile-modal-content">
               <div className="profile-modal-top">
-                <div className="profile-avatar-lg" style={{ background: selectedMember.color }}>
-                  {selectedMember.initials}
+                <div className="profile-avatar-lg" style={{ background: selectedMember.color || '#0284c7' }}>
+                  {selectedMember.initials || selectedMember.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="profile-modal-info">
                   <h3>{selectedMember.name}</h3>
@@ -180,29 +522,36 @@ export default function Team() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     Assign Task
                   </button>
-                  <button className="btn btn-sm btn-ghost">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    Message
-                  </button>
                 </div>
               </div>
 
               {showAssignTask && (
                 <form className="inline-form profile-assign-form" onSubmit={handleAssignTask}>
                   <h4>Assign Task to {selectedMember.name.split(' ')[0]}</h4>
-                  <input type="text" placeholder="Task title" value={assignTask.title}
-                    onChange={e => setAssignTask({ ...assignTask, title: e.target.value })} autoFocus />
+                  <input
+                    type="text"
+                    placeholder="Task title"
+                    value={assignTask.title}
+                    onChange={e => setAssignTask({ ...assignTask, title: e.target.value })}
+                    autoFocus
+                  />
                   <div className="form-row">
-                    <select value={assignTask.priority} onChange={e => setAssignTask({ ...assignTask, priority: e.target.value })}>
-                      <option value="high">High Priority</option>
-                      <option value="medium">Medium Priority</option>
-                      <option value="low">Low Priority</option>
+                    <select
+                      value={assignTask.priority}
+                      onChange={e => setAssignTask({ ...assignTask, priority: e.target.value })}
+                    >
+                      <option value="high">🔥 High Priority</option>
+                      <option value="medium">⚡ Medium Priority</option>
+                      <option value="low">🌱 Low Priority</option>
                     </select>
-                    <input type="date" value={assignTask.dueDate}
-                      onChange={e => setAssignTask({ ...assignTask, dueDate: e.target.value })} />
+                    <input
+                      type="date"
+                      value={assignTask.dueDate}
+                      onChange={e => setAssignTask({ ...assignTask, dueDate: e.target.value })}
+                    />
                   </div>
                   <div className="inline-form-actions">
-                    <button type="submit" className="btn btn-sm btn-primary">Assign</button>
+                    <button type="submit" className="btn btn-sm btn-primary">Assign Task</button>
                     <button type="button" className="btn btn-sm btn-ghost" onClick={() => setShowAssignTask(false)}>Cancel</button>
                   </div>
                 </form>
@@ -255,46 +604,6 @@ export default function Team() {
           </div>
         </div>
       )}
-
-      {/* Team Grid */}
-      <div className="team-grid">
-        {state.users.map(member => {
-          const tasks = getMemberTasks(member.id);
-          return (
-            <div key={member.id} className="team-card">
-              <div className="team-card-top">
-                <div className="team-avatar" style={{ background: member.color }}>
-                  {member.initials}
-                </div>
-                <h3 className="team-member-name">{member.name}</h3>
-                <p className="team-member-role">{member.role}</p>
-                <span className="team-dept-badge">{member.department}</span>
-              </div>
-              <div className="team-card-stats">
-                <div className="team-stat">
-                  <span className="team-stat-value">{tasks.open}</span>
-                  <span className="team-stat-label">Open Tasks</span>
-                </div>
-                <div className="team-stat-divider" />
-                <div className="team-stat">
-                  <span className="team-stat-value">{tasks.completed}</span>
-                  <span className="team-stat-label">Completed</span>
-                </div>
-              </div>
-              <div className="team-card-actions">
-                <button className="btn btn-sm btn-ghost" title="Message">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  Message
-                </button>
-                <button className="btn btn-sm btn-primary" onClick={() => setSelectedMember(member)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                  Profile
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

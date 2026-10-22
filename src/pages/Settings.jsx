@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 
 const accentColors = [
@@ -24,6 +24,30 @@ export default function Settings() {
   });
   const [saved, setSaved] = useState(false);
 
+  // SMTP Settings State
+  const [smtpConfig, setSmtpConfig] = useState({
+    gmailUser: '',
+    appPassword: '',
+    configured: false,
+    userMasked: ''
+  });
+  const [smtpLoading, setSmtpLoading] = useState(false);
+  const [smtpResult, setSmtpResult] = useState(null);
+
+  useEffect(() => {
+    // Check initial SMTP status from server
+    fetch('/api/config/smtp')
+      .then(res => res.json())
+      .then(data => {
+        setSmtpConfig(prev => ({
+          ...prev,
+          configured: data.configured,
+          userMasked: data.user || ''
+        }));
+      })
+      .catch(() => {});
+  }, []);
+
   const handleProfileSave = (e) => {
     e.preventDefault();
     dispatch({ type: 'UPDATE_PROFILE', payload: profileForm });
@@ -39,8 +63,48 @@ export default function Settings() {
     }
   };
 
+  const handleSmtpSave = async (e) => {
+    e.preventDefault();
+    if (!smtpConfig.gmailUser.trim() || !smtpConfig.appPassword.trim()) {
+      setSmtpResult({ success: false, message: 'Please enter both your Gmail address and 16-character App Password.' });
+      return;
+    }
+
+    setSmtpLoading(true);
+    setSmtpResult(null);
+
+    try {
+      const res = await fetch('/api/config/smtp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gmailUser: smtpConfig.gmailUser.trim(),
+          appPassword: smtpConfig.appPassword.trim()
+        })
+      });
+      const data = await res.json();
+
+      setSmtpResult(data);
+      if (data.success) {
+        setSmtpConfig(prev => ({
+          ...prev,
+          configured: true,
+          userMasked: smtpConfig.gmailUser.trim()
+        }));
+        if (triggerToast) {
+          triggerToast('Gmail SMTP Connected! 📬', data.message || 'Credentials verified and active.', 'success');
+        }
+      }
+    } catch (err) {
+      setSmtpResult({ success: false, message: 'Server connection error: ' + err.message });
+    } finally {
+      setSmtpLoading(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profile', icon: '👤' },
+    { id: 'smtp', label: 'Gmail SMTP & Email', icon: '✉️' },
     { id: 'notifications', label: 'Notifications', icon: '🔔' },
     { id: 'appearance', label: 'Appearance', icon: '🎨' },
   ];
@@ -50,7 +114,7 @@ export default function Settings() {
       <div className="page-header">
         <div>
           <h1>Settings</h1>
-          <p className="page-subtitle">Manage your account preferences and application settings</p>
+          <p className="page-subtitle">Manage your account preferences, Gmail SMTP integration, and application settings</p>
         </div>
       </div>
 
@@ -69,7 +133,7 @@ export default function Settings() {
         </div>
 
         <div className="settings-content">
-          {/* Profile Tab */}
+          {/* 1. Profile Tab */}
           {activeTab === 'profile' && (
             <div className="settings-section">
               <div className="settings-section-header">
@@ -78,8 +142,8 @@ export default function Settings() {
               </div>
 
               <div className="settings-profile-top">
-                <div className="settings-avatar" style={{ background: state.currentUser?.color }}>
-                  {state.currentUser?.initials}
+                <div className="settings-avatar" style={{ background: state.currentUser?.color || '#0284c7' }}>
+                  {state.currentUser?.initials || 'S'}
                 </div>
                 <div>
                   <h3>{state.currentUser?.name}</h3>
@@ -118,51 +182,112 @@ export default function Settings() {
                       <option>UTC+5:30 (IST)</option>
                       <option>UTC+8 (SGT)</option>
                       <option>UTC+9 (KST)</option>
-                      <option>UTC+10 (AEST)</option>
                     </select>
                   </div>
                 </div>
                 <div className="form-group">
                   <label>Bio</label>
-                  <textarea rows={4} placeholder="Write a short bio about yourself..."
-                    value={profileForm.bio}
-                    onChange={e => setProfileForm({ ...profileForm, bio: e.target.value })} />
+                  <textarea rows="3" value={profileForm.bio}
+                    onChange={e => setProfileForm({ ...profileForm, bio: e.target.value })}
+                    placeholder="Tell us about yourself..." />
                 </div>
-                <div className="form-actions">
-                  <button type="submit" className="btn btn-primary">
-                    {saved ? '✓ Saved!' : 'Save Changes'}
-                  </button>
-                </div>
+                <button type="submit" className="btn btn-primary">
+                  {saved ? '✓ Saved!' : 'Save Changes'}
+                </button>
               </form>
             </div>
           )}
 
-          {/* Notifications Tab */}
+          {/* 2. Gmail SMTP & Email Settings Tab */}
+          {activeTab === 'smtp' && (
+            <div className="settings-section">
+              <div className="settings-section-header">
+                <div className="smtp-header-title-row">
+                  <h2>Personal Gmail SMTP Configuration</h2>
+                  <span className={`smtp-status-pill ${smtpConfig.configured ? 'online' : 'offline'}`}>
+                    <span className="pill-dot" />
+                    {smtpConfig.configured ? 'SMTP Active' : 'Not Configured'}
+                  </span>
+                </div>
+                <p>
+                  Connect your personal Gmail account using a 16-character Google App Password to dispatch 2-Step OTP login codes and realtime team collaboration invitation emails.
+                </p>
+              </div>
+
+              {smtpResult && (
+                <div className={`smtp-alert-box ${smtpResult.success ? 'success' : 'error'}`}>
+                  <span>{smtpResult.message || smtpResult.warning}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSmtpSave} className="settings-form smtp-form">
+                <div className="form-group">
+                  <label>Personal Gmail Address *</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. yourname@gmail.com"
+                    value={smtpConfig.gmailUser}
+                    onChange={e => setSmtpConfig({ ...smtpConfig, gmailUser: e.target.value })}
+                    required
+                  />
+                  <span className="field-hint">The sender email address displayed on invitations and OTPs.</span>
+                </div>
+
+                <div className="form-group">
+                  <label>16-Character Google App Password *</label>
+                  <input
+                    type="password"
+                    placeholder="e.g. abcd efgh ijkl mnop"
+                    value={smtpConfig.appPassword}
+                    onChange={e => setSmtpConfig({ ...smtpConfig, appPassword: e.target.value })}
+                    required
+                  />
+                  <span className="field-hint">Spaces are automatically stripped before connecting.</span>
+                </div>
+
+                <div className="smtp-guide-card">
+                  <h4>💡 How to generate your 16-character Google App Password:</h4>
+                  <ol>
+                    <li>Go to your Google Account Security: <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer">myaccount.google.com/security</a></li>
+                    <li>Ensure <strong>2-Step Verification</strong> is enabled on your Google account.</li>
+                    <li>Open <strong>App passwords</strong> (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">myaccount.google.com/apppasswords</a>).</li>
+                    <li>Enter App name as <code>Trackify</code> and click <strong>Create</strong>.</li>
+                    <li>Copy the generated 16-character code and paste it above!</li>
+                  </ol>
+                </div>
+
+                <button type="submit" className="btn btn-primary" disabled={smtpLoading}>
+                  {smtpLoading ? 'Verifying with Google SMTP...' : 'Verify & Save Gmail SMTP Credentials'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* 3. Notifications Tab */}
           {activeTab === 'notifications' && (
             <div className="settings-section">
               <div className="settings-section-header">
                 <h2>Notification Preferences</h2>
-                <p>Choose how you want to be notified about updates</p>
+                <p>Choose what you get notified about</p>
               </div>
-
-              <div className="settings-toggles">
+              <div className="notification-options">
                 {[
-                  { key: 'notifyEmail', label: 'Email Notifications', desc: 'Receive notifications via email' },
-                  { key: 'notifyPush', label: 'Push Notifications', desc: 'Receive browser push notifications' },
-                  { key: 'notifyTaskUpdate', label: 'Task Updates', desc: 'Get notified when tasks are updated or moved' },
-                  { key: 'notifyMention', label: 'Mentions', desc: 'Get notified when someone mentions you' },
-                  { key: 'notifyDeadline', label: 'Deadline Reminders', desc: 'Receive reminders before task deadlines' },
-                ].map(item => (
-                  <div key={item.key} className="settings-toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-label">{item.label}</span>
-                      <span className="toggle-desc">{item.desc}</span>
+                  { key: 'emailNotifications', label: 'Email Notifications (Gmail SMTP)', desc: 'Receive real email updates for 2-step OTP codes and team invitations' },
+                  { key: 'taskAssigned', label: 'Task Assignments', desc: 'Get notified when a task is assigned to you' },
+                  { key: 'taskCompleted', label: 'Task Completions', desc: 'Get notified when a task you created is completed' },
+                  { key: 'projectUpdates', label: 'Project Milestones', desc: 'Get notified on significant project milestone changes' },
+                  { key: 'reminders', label: 'Scheduled Reminders', desc: 'Get notified for upcoming calendar reminders' },
+                ].map(opt => (
+                  <div key={opt.key} className="notification-option">
+                    <div>
+                      <h4>{opt.label}</h4>
+                      <p>{opt.desc}</p>
                     </div>
                     <label className="toggle-switch">
                       <input
                         type="checkbox"
-                        checked={state.settings[item.key]}
-                        onChange={(e) => handleSettingChange(item.key, e.target.checked)}
+                        checked={state.settings[opt.key] ?? true}
+                        onChange={e => handleSettingChange(opt.key, e.target.checked)}
                       />
                       <span className="toggle-slider" />
                     </label>
@@ -172,21 +297,22 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Appearance Tab */}
+          {/* 4. Appearance Tab */}
           {activeTab === 'appearance' && (
             <div className="settings-section">
               <div className="settings-section-header">
                 <h2>Appearance</h2>
-                <p>Customize the look and feel of your workspace</p>
+                <p>Customize the look and feel of your Trackify workspace</p>
               </div>
 
-              {/* Theme */}
+              {/* Theme Mode */}
               <div className="settings-group">
-                <h3>Theme</h3>
+                <h3>Theme Mode</h3>
                 <div className="theme-options">
                   {[
                     { id: 'light', label: 'Light', icon: '☀️' },
                     { id: 'dark', label: 'Dark', icon: '🌙' },
+                    { id: 'system', label: 'System', icon: '💻' },
                   ].map(theme => (
                     <button
                       key={theme.id}
